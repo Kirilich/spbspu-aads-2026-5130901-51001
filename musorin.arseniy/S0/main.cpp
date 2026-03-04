@@ -1,5 +1,6 @@
-#include <iostream>
 #include "credentials.hpp"
-int main() {
+#include <iostream>
+int main()
+{
   musorin::out_credentials(std::cout) << "\n";
 }
