@@ -81,9 +81,9 @@ namespace nabieva
       node = node->next;
       return *this;
     }
-    LIter<T> operator++(int)
+    LCIter<T> operator++(int)
     {
-      LIter<T> temp = *this;
+      LCIter<T> temp = *this;
       node = node->next;
       return temp;
     }
@@ -92,7 +92,7 @@ namespace nabieva
     {
       return node != other.node;
     }
-    bool operator==(const LIter<T> other) const
+    bool operator==(const LCIter<T> other) const
     {
       return node == other.node;
     }
@@ -115,6 +115,36 @@ namespace nabieva
     LIter<T> end()
     {
       return LIter<T>(nullptr);
+    }
+
+    T& front()
+    {
+      return head->data;
+    }
+
+    const T& front() const
+    {
+      return head->data;
+    }
+
+    T& back()
+    {
+      Node<T>* current = head;
+      while (current->next)
+      {
+        current = current->next;
+      }
+      return current->data;
+    }
+
+    const T& back() const
+    {
+      Node<T>* current = head;
+      while (current->next)
+      {
+        current = current->next;
+      }
+      return current->data;
     }
 
     void push_front(const T& value)
@@ -151,6 +181,28 @@ namespace nabieva
       head = head->next;
       delete tmp;
     }
+
+    void pop_back()
+    {
+      if (!head)
+      {
+        return;
+      }
+      if (!head->next)
+      {
+        delete head;
+        head = nullptr;
+        return;
+      }
+      Node<T>* current = head;
+      while (current->next->next)
+      {
+        current = current->next;
+      }
+      delete current->next;
+      current->next = nullptr;
+    }
+
 
     bool empty() const
     {
@@ -193,6 +245,16 @@ namespace nabieva
         }
       }
       return *this;
+    }
+
+    LCIter<T> cbegin() const
+    {
+      return LCIter<T>(head);
+    }
+
+    LCIter<T> cend() const
+    {
+      return LCIter<T>(nullptr);
     }
   };
 }
