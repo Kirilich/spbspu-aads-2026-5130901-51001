@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <limits>
 #include "list.hpp"
 
 struct NamedList
@@ -17,15 +18,13 @@ int main()
   {
     NamedList seq;
     seq.name = name;
-
-    std::string line;
-    std::getline(std::cin, line);
-    std::stringstream ss(line);
     int number;
-    while (ss >> number)
+    while (std::cin.peek() != '\n' && std::cin >> number)
     {
       seq.numbers.push_back(number);
     }
+    std::cin.clear();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     sequences.push_back(seq);
   }
   if (sequences.empty())
@@ -60,6 +59,11 @@ int main()
       {
         int value = *it;
         std::cout << value << " ";
+        if (sum > std::numeric_limits<long long>::max() - value)
+        {
+          std::cerr << "overflow\n";
+          return 1;
+        }
         sum += value;
         ++it;
         finished = false;
