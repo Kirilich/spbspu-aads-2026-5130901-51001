@@ -106,6 +106,27 @@ namespace nabieva
     List():
       head(nullptr)
     {}
+
+    void push_back(const T& value)
+    {
+      Node<T>* node = new Node<T>(value);
+      if (!head)
+      {
+        head = node;
+        return;
+      }
+      Node<T>* current = head;
+      while (current->next)
+      {
+        current = current->next;
+      }
+      current->next = node;
+    }
+
+    bool empty() const
+    {
+      return head == nullptr;
+    }
   };
 }
 
