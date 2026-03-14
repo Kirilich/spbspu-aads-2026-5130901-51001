@@ -30,16 +30,30 @@ namespace nabieva
     {
       return node->data;
     }
+    T* operator->()
+    {
+      return &(node->data);
+    }
 
     LIter& operator++()
     {
       node = node->next;
       return *this;
     }
+    LIter<T> operator++(int)
+    {
+      LIter<T> temp = *this;
+      node = node->next;
+      return temp;
+    }
 
     bool operator!=(const LIter& other) const
     {
       return node != other.node;
+    }
+    bool operator==(LIter<T> other) const
+    {
+      return node == other.node;
     }
   };
 
@@ -57,16 +71,30 @@ namespace nabieva
     {
       return node->data;
     }
+    const T* operator->() const
+    {
+      return &(node->data);
+    }
 
     LCIter& operator++()
     {
       node = node->next;
       return *this;
     }
+    LIter<T> operator++(int)
+    {
+      LIter<T> temp = *this;
+      node = node->next;
+      return temp;
+    }
 
     bool operator!=(const LCIter& other) const
     {
       return node != other.node;
+    }
+    bool operator==(const LIter<T> other) const
+    {
+      return node == other.node;
     }
   };
 
