@@ -15,11 +15,32 @@ public:
   void push(const T& rhs);
   T pop();
 
-  const T& front() const;
-  const T& back() const;
+  const T& front() const {
+    if (empty()) {
+      throw std::logic_error("Queue is empty");
+    }
+    return data[head];
+  }
+  const T& back() const {
+    if (empty()) {
+      throw std::runtime_error("Queue is empty");
+    }
+    size_t last;
+    if (tail == 0) {
+      last = capacity - 1;
+    }
+    else {
+      last = tail - 1;
+    }
+    return data[last];
+  }
 
-  bool empty() const;
-  size_t size() const;
+  bool empty() const {
+    return count == 0;
+  }
+  size_t size() const {
+    return count;
+  }
 
 private:
   T* data;
