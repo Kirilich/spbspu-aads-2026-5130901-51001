@@ -257,6 +257,27 @@ namespace nabieva
       return *this;
     }
 
+    List(List&& other) noexcept:
+      head(other.head),
+      tail(other.tail)
+    {
+      other.head = nullptr;
+      other.tail = nullptr;
+    }
+
+    List& operator=(List&& other) noexcept
+    {
+      if (this != &other)
+      {
+        clear();
+        head = other.head;
+        tail = other.tail;
+        other.head = nullptr;
+        other.tail = nullptr;
+      }
+      return *this;
+    }
+
     LCIter<T> cbegin() const
     {
       return LCIter<T>(head);
