@@ -102,6 +102,7 @@ namespace nabieva
   class List {
   private:
     Node<T>* head;
+    Node<T>* tail;
   public:
     List():
       head(nullptr)
@@ -152,57 +153,69 @@ namespace nabieva
       Node<T>* node = new Node<T>(value);
       node->next = head;
       head = node;
+      if (!tail) {
+        tail = head;
+      }
     }
 
     void push_back(const T& value)
     {
-      Node<T>* node = new Node<T>(value);
+      insert_after(end(), value);
+    }
+
+    LIter<T> insert_after(LIter<T> pos, const T& value)
+    {
+      Node<T>* newNode = new Node<T>(value);
+
       if (!head)
       {
-        head = node;
-        return;
+        head = newNode;
+        tail = newNode;
+        return LIter<T>(newNode);
       }
-      Node<T>* current = head;
-      while (current->next)
+      if (!pos.node)
       {
-        current = current->next;
+        tail->next = newNode;
+        tail = newNode;
+        return LIter<T>(newNode);
       }
-      current->next = node;
+      newNode->next = pos.node->next;
+      pos.node->next = newNode;
+
+      if (newNode->next == nullptr)
+      {
+        tail = newNode;
+      }
+      return LIter<T>(newNode);
     }
 
     void pop_front()
     {
-      if (!head)
-      {
-        return;
-      }
-
+      if (!head) return;
       Node<T>* tmp = head;
       head = head->next;
+      if (!head) tail = nullptr;
       delete tmp;
     }
 
     void pop_back()
     {
-      if (!head)
-      {
-        return;
-      }
-      if (!head->next)
+      if (!head) return;
+      if (head == tail)
       {
         delete head;
-        head = nullptr;
+        head = tail = nullptr;
         return;
       }
       Node<T>* current = head;
-      while (current->next->next)
+      while (current->next != tail)
       {
         current = current->next;
       }
-      delete current->next;
-      current->next = nullptr;
+      delete tail;
+      tail = current;
+      tail->next = nullptr;
     }
-
 
     bool empty() const
     {
@@ -220,7 +233,9 @@ namespace nabieva
       {
         pop_front();
       }
+      tail = nullptr;
     }
+
     List(const List& other)
     {
       head = nullptr;
