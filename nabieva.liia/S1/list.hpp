@@ -1,5 +1,6 @@
 #ifndef LIST_HPP
 #define LIST_HPP
+#include <stdexcept>
 
 namespace nabieva
 {
@@ -51,7 +52,7 @@ namespace nabieva
     {
       return node != other.node;
     }
-    bool operator==(LIter<T> other) const
+    bool operator==(const LIter& other) const
     {
       return node == other.node;
     }
@@ -92,7 +93,7 @@ namespace nabieva
     {
       return node != other.node;
     }
-    bool operator==(const LCIter<T> other) const
+    bool operator==(const LCIter& other) const
     {
       return node == other.node;
     }
@@ -105,7 +106,8 @@ namespace nabieva
     Node<T>* tail;
   public:
     List():
-      head(nullptr)
+      head(nullptr),
+      tail(nullptr)
     {}
 
     LIter<T> begin()
@@ -130,22 +132,14 @@ namespace nabieva
 
     T& back()
     {
-      Node<T>* current = head;
-      while (current->next)
-      {
-        current = current->next;
-      }
-      return current->data;
+      if (!tail) throw std::logic_error("empty list");
+      return tail->data;
     }
 
     const T& back() const
     {
-      Node<T>* current = head;
-      while (current->next)
-      {
-        current = current->next;
-      }
-      return current->data;
+      if (!tail) throw std::logic_error("empty list");
+      return tail->data;
     }
 
     void push_front(const T& value)
@@ -236,9 +230,10 @@ namespace nabieva
       tail = nullptr;
     }
 
-    List(const List& other)
+    List(const List& other):
+      head(nullptr),
+      tail(nullptr)
     {
-      head = nullptr;
       Node<T>* current = other.head;
       while (current)
       {
