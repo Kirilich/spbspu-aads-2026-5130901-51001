@@ -37,7 +37,7 @@ int main()
     std::cout << (*it).name << " ";
   }
   std::cout << "\n";
-  
+
   nabieva::List<nabieva::LIter<int>> iters;
   for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
   {
