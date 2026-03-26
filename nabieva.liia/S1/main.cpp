@@ -14,8 +14,6 @@ int main()
 {
   nabieva::List<NamedList> sequences;
   std::string line;
-
-  // Чтение построчно
   while (std::getline(std::cin, line))
   {
     if (line.empty()) continue;
@@ -43,8 +41,6 @@ int main()
     std::cout << "0\n";
     return 0;
   }
-
-  // Вывод названий
   for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
   {
     std::cout << (*it).name;
@@ -54,8 +50,6 @@ int main()
       std::cout << " ";
   }
   std::cout << "\n";
-
-  // Создаем массив итераторов для каждой последовательности
   nabieva::List<nabieva::LIter<int>> currentIters;
   for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
   {
@@ -108,8 +102,6 @@ int main()
       std::cout << "\n";
     }
   }
-
-  // Вывод сумм
   for (nabieva::LIter<long long> it = sums.begin(); it != sums.end(); ++it)
   {
     std::cout << *it;
