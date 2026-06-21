@@ -55,13 +55,13 @@ int main()
     currentIters.push_back((*it).numbers.begin());
   }
 
-  nabieva::List<long long> sums;
+  nabieva::List<unsigned long long> sums;
   bool hasElements = true;
 
   while (hasElements)
   {
     hasElements = false;
-    long long sum = 0;
+    unsigned long long sum = 0;
     nabieva::LIter<nabieva::LIter<unsigned long long>> iterIt = currentIters.begin();
     nabieva::LIter<NamedList> seqIt = sequences.begin();
 
@@ -74,7 +74,7 @@ int main()
       {
         unsigned long long value = *current;
         std::cout << value;
-        if (sum > std::numeric_limits<long long>::max() - value)
+        if (sum > std::numeric_limits<unsigned long long>::max() - value)
         {
           std::cerr << "overflow\n";
           return 1;
@@ -107,10 +107,10 @@ int main()
   }
   else
   {
-    for (nabieva::LIter<long long> it = sums.begin(); it != sums.end(); ++it)
+    for (nabieva::LIter<unsigned long long> it = sums.begin(); it != sums.end(); ++it)
     {
       std::cout << *it;
-      nabieva::LIter<long long> next = it;
+      nabieva::LIter<unsigned long long> next = it;
       ++next;
       if (next != sums.end())
         std::cout << " ";
