@@ -1,6 +1,7 @@
 #ifndef LITER_HPP
 #define LITER_HPP
 #include "node.hpp"
+#include <stdexcept>
 
 namespace nabieva
 {
@@ -19,6 +20,7 @@ namespace nabieva
 
     T& operator*()
     {
+      if (!node) throw std::logic_error("dereferencing end iterator");
       return node->data;
     }
     T* operator->()
@@ -61,6 +63,7 @@ namespace nabieva
 
     const T& operator*() const
     {
+      if (!node) throw std::logic_error("dereferencing end iterator");
       return node->data;
     }
     const T* operator->() const

@@ -29,11 +29,13 @@ namespace nabieva
 
     T& front()
     {
+      if (!head) throw std::logic_error("empty list");
       return head->data;
     }
 
     const T& front() const
     {
+      if (!head) throw std::logic_error("empty list");
       return head->data;
     }
 
