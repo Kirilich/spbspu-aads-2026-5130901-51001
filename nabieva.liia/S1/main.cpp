@@ -40,15 +40,6 @@ int main()
     std::cout << "0\n";
     return 0;
   }
-  for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
-  {
-    std::cout << (*it).name;
-    nabieva::LIter<NamedList> next = it;
-    ++next;
-    if (next != sequences.end())
-      std::cout << " ";
-  }
-  std::cout << "\n";
   nabieva::List<nabieva::LIter<unsigned long long>> currentIters;
   for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
   {
@@ -73,7 +64,6 @@ int main()
       if (current != numbers.end())
       {
         unsigned long long value = *current;
-        std::cout << value;
         if (sum > std::numeric_limits<unsigned long long>::max() - value)
         {
           std::cerr << "overflow\n";
@@ -85,22 +75,66 @@ int main()
       }
       ++seqIt;
       ++iterIt;
-      if (seqIt != sequences.end() && hasElements)
-      {
-        nabieva::LIter<unsigned long long>& nextCurrent = *iterIt;
-        if (nextCurrent != (*seqIt).numbers.end())
-        {
-          std::cout << " ";
-        }
-      }
     }
 
     if (hasElements)
     {
       sums.push_back(sum);
+    }
+  }
+
+  for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
+  {
+    std::cout << (*it).name;
+    nabieva::LIter<NamedList> next = it;
+    ++next;
+    if (next != sequences.end())
+      std::cout << " ";
+  }
+  std::cout << "\n";
+
+  nabieva::List<nabieva::LIter<unsigned long long>> currentItersForOutput;
+  for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
+  {
+    currentItersForOutput.push_back((*it).numbers.begin());
+  }
+
+  bool hasElementsForOutput = true;
+  while (hasElementsForOutput)
+  {
+    hasElementsForOutput = false;
+    nabieva::LIter<nabieva::LIter<unsigned long long>> iterIt = currentItersForOutput.begin();
+    nabieva::LIter<NamedList> seqIt = sequences.begin();
+    bool firstElement = true;
+
+    while (seqIt != sequences.end() && iterIt != currentItersForOutput.end())
+    {
+      nabieva::List<unsigned long long>& numbers = (*seqIt).numbers;
+      nabieva::LIter<unsigned long long>& current = *iterIt;
+
+      if (current != numbers.end())
+      {
+        if (!firstElement)
+        {
+          std::cout << " ";
+        }
+        firstElement = false;
+
+        std::cout << *current;
+        ++current;
+        hasElementsForOutput = true;
+      }
+
+      ++seqIt;
+      ++iterIt;
+    }
+
+    if (hasElementsForOutput)
+    {
       std::cout << "\n";
     }
   }
+
   if (sums.empty())
   {
     std::cout << "0\n";
