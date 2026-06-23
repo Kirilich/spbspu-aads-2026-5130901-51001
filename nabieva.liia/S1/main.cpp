@@ -32,10 +32,6 @@ namespace nabieva {
       {
         seq.numbers.push_back(number);
       }
-      if (iss.fail() && !iss.eof())
-      {
-        throw std::overflow_error("overflow");
-      }
       sequences.push_back(seq);
     }
   }
@@ -91,7 +87,11 @@ namespace nabieva {
   nabieva::List<size_t> countSum(nabieva::List<nabieva::List<size_t>>& columns)
   {
     nabieva::List<size_t> sums;
-
+    if (columns.empty())
+    {
+      sums.push_back(0);
+      return sums;
+    }
     for (nabieva::LIter<nabieva::List<size_t>> colIt = columns.begin(); colIt != columns.end(); ++colIt)
     {
       size_t sum = 0;
