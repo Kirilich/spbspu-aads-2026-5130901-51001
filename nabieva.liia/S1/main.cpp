@@ -12,7 +12,7 @@ struct NamedList
 
 
 namespace nabieva {
-  nabieva::List<size_t> readInput(List<NamedList>& sequences) {
+   void readInput(List<NamedList>& sequences) {
     std::string line;
     while (std::getline(std::cin, line))
     {
