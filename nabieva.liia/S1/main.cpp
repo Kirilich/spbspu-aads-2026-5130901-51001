@@ -12,7 +12,8 @@ struct NamedList
 
 
 namespace nabieva {
-  void readInput(List<NamedList> sequences) {
+  nabieva::List<size_t> readInput(List<NamedList>& sequences) {
+    std::string line;
     while (std::getline(std::cin, line))
     {
       if (line.empty()) continue;
@@ -33,12 +34,42 @@ namespace nabieva {
       }
       sequences.push_back(seq);
     }
+  }
 
-    if (sequences.empty())
+  nabieva::List<nabieva::List<size_t>> transposeToColumns(nabieva::List<NamedList>& sequences)
+  {
+    nabieva::List<nabieva::List<size_t>> columns;
+    size_t maxLength = 0;
+    for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
     {
-      std::cout << "0\n";
-      return 0;
+      size_t length = 0;
+      for (nabieva::LIter<size_t> numIt = (*it).numbers.begin(); numIt != (*it).numbers.end(); ++numIt)
+      {
+        ++length;
+      }
+      if (length > maxLength)
+        maxLength = length;
     }
+    for (size_t col = 0; col < maxLength; ++col)
+    {
+      nabieva::List<size_t> column;
+      for (nabieva::LIter<NamedList> seqIt = sequences.begin(); seqIt != sequences.end(); ++seqIt)
+      {
+        nabieva::List<size_t>& numbers = (*seqIt).numbers;
+        nabieva::LIter<size_t> numIt = numbers.begin();
+        for (size_t i = 0; i < col && numIt != numbers.end(); ++i)
+        {
+          ++numIt;
+        }
+
+        if (numIt != numbers.end())
+        {
+          column.push_back(*numIt);
+        }
+      }
+      columns.push_back(column);
+    }
+    return columns;
   }
 
   void printName(List<NamedList> sequences) {
@@ -53,118 +84,78 @@ namespace nabieva {
     std::cout << "\n";
   }
 
-  nabieva::List<nabieva::List<size_t>> countSum(List<NamedList> sequences) {
-    nabieva::List<nabieva::LIter<size_t>> currentIters;
-    for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
-    {
-      currentIters.push_back((*it).numbers.begin());
-    }
-
+  nabieva::List<size_t> countSum(nabieva::List<nabieva::List<size_t>>& columns)
+  {
     nabieva::List<size_t> sums;
-    bool hasElements = true;
 
-    while (hasElements)
+    for (nabieva::LIter<nabieva::List<size_t>> colIt = columns.begin(); colIt != columns.end(); ++colIt)
     {
-      hasElements = false;
       size_t sum = 0;
-      nabieva::LIter<nabieva::LIter<size_t>> iterIt = currentIters.begin();
-      nabieva::LIter<NamedList> seqIt = sequences.begin();
-
-      while (seqIt != sequences.end() && iterIt != currentIters.end())
+      nabieva::List<size_t>& column = *colIt;
+      for (nabieva::LIter<size_t> numIt = column.begin(); numIt != column.end(); ++numIt)
       {
-        nabieva::List<size_t>& numbers = (*seqIt).numbers;
-        nabieva::LIter<size_t>& current = *iterIt;
-
-        if (current != numbers.end())
+        size_t value = *numIt;
+        if (sum > std::numeric_limits<size_t>::max() - value)
         {
-          size_t value = *current;
-          if (sum > std::numeric_limits<size_t>::max() - value)
-          {
-            std::cerr << "overflow\n";
-            return 1;
-          }
-          sum += value;
-          ++current;
-          hasElements = true;
+          throw std::overflow_error("overflow");
         }
-        ++seqIt;
-        ++iterIt;
+        sum += value;
       }
-
-      if (hasElements)
-      {
-        sums.push_back(sum);
-      }
+      sums.push_back(sum);
     }
+    return sums;
+  }
+
+  void printColumn(nabieva::List<nabieva::List<size_t>>& columns) {
+    for (nabieva::LIter<nabieva::List<size_t>> colIt = columns.begin(); colIt != columns.end(); ++colIt)
+    {
+      nabieva::List<size_t>& column = *colIt;
+      bool first = true;
+      for (nabieva::LIter<size_t> it = column.begin(); it != column.end(); ++it)
+      {
+        if (!first)
+          std::cout << " ";
+        first = false;
+        std::cout << *it;
+      }
+      std::cout << "\n";
+    }
+  }
+
+  void printSum(nabieva::List<size_t>& sums) {
+    bool first = true;
+    for (nabieva::LIter<size_t> it = sums.begin(); it != sums.end(); ++it)
+    {
+      if (!first)
+        std::cout << " ";
+      first = false;
+      std::cout << *it;
+    }
+    std::cout << "\n";
   }
 }
 
 int main()
 {
   nabieva::List<NamedList> sequences;
-  std::string line;
 
-  readInput(&sequences);
-
-  printName(&sequences);
-
-  nabieva::List<nabieva::LIter<size_t>> currentItersForOutput;
-  for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
-  {
-    currentItersForOutput.push_back((*it).numbers.begin());
-  }
-
-  bool hasElementsForOutput = true;
-  while (hasElementsForOutput)
-  {
-    hasElementsForOutput = false;
-    nabieva::LIter<nabieva::LIter<size_t>> iterIt = currentItersForOutput.begin();
-    nabieva::LIter<NamedList> seqIt = sequences.begin();
-    bool firstElement = true;
-
-    while (seqIt != sequences.end() && iterIt != currentItersForOutput.end())
-    {
-      nabieva::List<size_t>& numbers = (*seqIt).numbers;
-      nabieva::LIter<size_t>& current = *iterIt;
-
-      if (current != numbers.end())
-      {
-        if (!firstElement)
-        {
-          std::cout << " ";
-        }
-        firstElement = false;
-
-        std::cout << *current;
-        ++current;
-        hasElementsForOutput = true;
-      }
-
-      ++seqIt;
-      ++iterIt;
-    }
-
-    if (hasElementsForOutput)
-    {
-      std::cout << "\n";
-    }
-  }
-
-  if (sums.empty())
+  readInput(sequences);
+  if (sequences.empty())
   {
     std::cout << "0\n";
+    return 0;
   }
-  else
+  nabieva::List<nabieva::List<size_t>> columns = transposeToColumns(sequences);
+  try {
+    nabieva::List<size_t> sums = countSum(columns);
+    printName(sequences);
+    printColumn(columns);
+    printSum(sums);
+  }
+  catch (const std::overflow_error& e)
   {
-    for (nabieva::LIter<size_t> it = sums.begin(); it != sums.end(); ++it)
-    {
-      std::cout << *it;
-      nabieva::LIter<size_t> next = it;
-      ++next;
-      if (next != sums.end())
-        std::cout << " ";
-    }
-    std::cout << "\n";
+    std::cerr << e.what() << "\n";
+    return 1;
   }
   return 0;
 }
