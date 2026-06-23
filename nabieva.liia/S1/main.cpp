@@ -32,6 +32,10 @@ namespace nabieva {
       {
         seq.numbers.push_back(number);
       }
+      if (iss.fail() && !iss.eof())
+      {
+        throw std::overflow_error("overflow");
+      }
       sequences.push_back(seq);
     }
   }
@@ -138,15 +142,14 @@ namespace nabieva {
 int main()
 {
   nabieva::List<NamedList> sequences;
-
-  readInput(sequences);
-  if (sequences.empty())
-  {
-    std::cout << "0\n";
-    return 0;
-  }
-  nabieva::List<nabieva::List<size_t>> columns = transposeToColumns(sequences);
   try {
+    readInput(sequences);
+    if (sequences.empty())
+    {
+      std::cout << "0\n";
+      return 0;
+    }
+    nabieva::List<nabieva::List<size_t>> columns = transposeToColumns(sequences);
     nabieva::List<size_t> sums = countSum(columns);
     printName(sequences);
     printColumn(columns);
