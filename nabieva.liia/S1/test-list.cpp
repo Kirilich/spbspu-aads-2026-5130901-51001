@@ -116,5 +116,63 @@ BOOST_AUTO_TEST_CASE(test_clear)
     BOOST_CHECK_THROW(list.back(), std::logic_error);
 }
 
+BOOST_AUTO_TEST_CASE(test_iterator_order)
+{
+    List< int > list;
+    list.push_back(10);
+    list.push_back(20);
+    list.push_back(30);
+
+    LIter< int > it = list.begin();
+    BOOST_REQUIRE(it != list.end());
+    BOOST_CHECK_EQUAL(*it, 10);
+    ++it;
+    BOOST_REQUIRE(it != list.end());
+    BOOST_CHECK_EQUAL(*it, 20);
+    ++it;
+    BOOST_REQUIRE(it != list.end());
+    BOOST_CHECK_EQUAL(*it, 30);
+    ++it;
+    BOOST_CHECK(it == list.end());
+}
+
+BOOST_AUTO_TEST_CASE(test_iterator_postincrement)
+{
+    List< int > list;
+    list.push_back(5);
+    list.push_back(6);
+
+    LIter< int > it = list.begin();
+    LIter< int > old = it++;
+
+    BOOST_CHECK_EQUAL(*old, 5);
+    BOOST_CHECK_EQUAL(*it, 6);
+}
+
+BOOST_AUTO_TEST_CASE(test_const_iterator_order)
+{
+    List< int > list;
+    list.push_back(7);
+    list.push_back(8);
+
+    const List< int >& constList = list;
+    LCIter< int > it = constList.cbegin();
+
+    BOOST_REQUIRE(it != constList.cend());
+    BOOST_CHECK_EQUAL(*it, 7);
+    ++it;
+    BOOST_REQUIRE(it != constList.cend());
+    BOOST_CHECK_EQUAL(*it, 8);
+    ++it;
+    BOOST_CHECK(it == constList.cend());
+}
+
+BOOST_AUTO_TEST_CASE(test_dereference_end_iterator_throws)
+{
+    List< int > list;
+
+    BOOST_CHECK_THROW(*list.end(), std::logic_error);
+    BOOST_CHECK_THROW(*list.cend(), std::logic_error);
+}
 
 BOOST_AUTO_TEST_SUITE_END()
