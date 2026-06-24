@@ -150,9 +150,9 @@ int main()
       return 0;
     }
     nabieva::List<nabieva::List<size_t>> columns = transposeToColumns(sequences);
-    nabieva::List<size_t> sums = countSum(columns);
     printName(sequences);
     printColumn(columns);
+    nabieva::List<size_t> sums = countSum(columns);
     printSum(sums);
   }
   catch (const std::overflow_error& e)
