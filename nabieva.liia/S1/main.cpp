@@ -72,7 +72,7 @@ namespace nabieva {
     return columns;
   }
 
-  void printName(List<NamedList> sequences) {
+  void printName(List<NamedList>& sequences) {
     for (nabieva::LIter<NamedList> it = sequences.begin(); it != sequences.end(); ++it)
     {
       std::cout << (*it).name;
@@ -141,6 +141,8 @@ namespace nabieva {
 
 int main()
 {
+  std::cout << sizeof(size_t) << '\n';
+  std::cout << std::numeric_limits<size_t>::max() << '\n';
   nabieva::List<NamedList> sequences;
   try {
     readInput(sequences);
