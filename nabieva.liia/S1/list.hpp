@@ -180,10 +180,7 @@ namespace nabieva
       if (this != &other)
       {
         clear();
-        head = other.head;
-        tail = other.tail;
-        other.head = nullptr;
-        other.tail = nullptr;
+        swap(other);
       }
       return *this;
     }
