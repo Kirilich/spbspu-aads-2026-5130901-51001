@@ -175,4 +175,48 @@ BOOST_AUTO_TEST_CASE(test_dereference_end_iterator_throws)
     BOOST_CHECK_THROW(*list.cend(), std::logic_error);
 }
 
+BOOST_AUTO_TEST_CASE(test_insert_after_middle)
+{
+    List< int > list;
+    list.push_back(1);
+    list.push_back(3);
+
+    LIter< int > pos = list.begin();
+    list.insert_after(pos, 2);
+
+    LIter< int > it = list.begin();
+    BOOST_CHECK_EQUAL(*it, 1);
+    ++it;
+    BOOST_CHECK_EQUAL(*it, 2);
+    ++it;
+    BOOST_CHECK_EQUAL(*it, 3);
+    ++it;
+    BOOST_CHECK(it == list.end());
+}
+
+BOOST_AUTO_TEST_CASE(test_insert_after_end_appends)
+{
+    List< int > list;
+    list.push_back(1);
+    list.push_back(2);
+
+    LIter< int > inserted = list.insert_after(list.end(), 3);
+
+    BOOST_CHECK_EQUAL(*inserted, 3);
+    BOOST_CHECK_EQUAL(list.back(), 3);
+    BOOST_CHECK_EQUAL(getSize(list), 3u);
+}
+
+BOOST_AUTO_TEST_CASE(test_insert_after_end_on_empty)
+{
+    List< int > list;
+
+    LIter< int > inserted = list.insert_after(list.end(), 42);
+
+    BOOST_CHECK(!list.empty());
+    BOOST_CHECK_EQUAL(*inserted, 42);
+    BOOST_CHECK_EQUAL(list.front(), 42);
+    BOOST_CHECK_EQUAL(list.back(), 42);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
