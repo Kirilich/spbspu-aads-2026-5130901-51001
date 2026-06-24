@@ -269,4 +269,54 @@ BOOST_AUTO_TEST_CASE(test_self_copy_assignment)
     BOOST_CHECK_EQUAL(getSize(list), 2u);
 }
 
+BOOST_AUTO_TEST_CASE(test_move_constructor)
+{
+    List< int > original;
+    original.push_back(9);
+    original.push_back(10);
+
+    List< int > moved(std::move(original));
+
+    BOOST_CHECK(original.empty());
+    BOOST_CHECK_EQUAL(moved.front(), 9);
+    BOOST_CHECK_EQUAL(moved.back(), 10);
+    BOOST_CHECK_EQUAL(getSize(moved), 2u);
+}
+
+BOOST_AUTO_TEST_CASE(test_move_assignment)
+{
+    List< int > original;
+    original.push_back(11);
+    original.push_back(12);
+
+    List< int > moved;
+    moved.push_back(100);
+    moved = std::move(original);
+
+    BOOST_CHECK(original.empty());
+    BOOST_CHECK_EQUAL(moved.front(), 11);
+    BOOST_CHECK_EQUAL(moved.back(), 12);
+    BOOST_CHECK_EQUAL(getSize(moved), 2u);
+}
+
+BOOST_AUTO_TEST_CASE(test_swap)
+{
+    List< int > first;
+    first.push_back(1);
+    first.push_back(2);
+
+    List< int > second;
+    second.push_back(3);
+
+    first.swap(second);
+
+    BOOST_CHECK_EQUAL(first.front(), 3);
+    BOOST_CHECK_EQUAL(first.back(), 3);
+    BOOST_CHECK_EQUAL(getSize(first), 1u);
+
+    BOOST_CHECK_EQUAL(second.front(), 1);
+    BOOST_CHECK_EQUAL(second.back(), 2);
+    BOOST_CHECK_EQUAL(getSize(second), 2u);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
