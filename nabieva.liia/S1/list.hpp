@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include "node.hpp"
 #include "liter.hpp"
+#include <algorithm>
 
 namespace nabieva
 {
@@ -163,8 +164,8 @@ namespace nabieva
 
     void swap(List& other) noexcept
     {
-      swap(head, other.head);
-      swap(tail, other.tail);
+      std::swap(head, other.head);
+      std::swap(tail, other.tail);
     }
 
     List(List&& other) noexcept:
@@ -195,16 +196,16 @@ namespace nabieva
       return LCIter<T>(nullptr);
     }
   };
+  template < class T >
+  size_t getSize(const List< T >& list)
+  {
+    size_t count = 0;
+    for (LCIter< T > it = list.cbegin(); it != list.cend(); ++it)
+    {
+      ++count;
+    }
+    return count;
+  }
 }
 
-template < class T >
-size_t getSize(const List< T >& list)
-{
-  size_t count = 0;
-  for (LCIter< T > it = list.cbegin(); it != list.cend(); ++it)
-  {
-    ++count;
-  }
-  return count;
-}
 #endif
