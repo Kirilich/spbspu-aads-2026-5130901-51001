@@ -319,4 +319,14 @@ BOOST_AUTO_TEST_CASE(test_swap)
     BOOST_CHECK_EQUAL(getSize(second), 2u);
 }
 
+BOOST_AUTO_TEST_CASE(test_list_with_strings)
+{
+    List< std::string > list;
+    list.push_back("first");
+    list.push_back("second");
+
+    BOOST_CHECK_EQUAL(list.front(), "first");
+    BOOST_CHECK_EQUAL(list.back(), "second");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
