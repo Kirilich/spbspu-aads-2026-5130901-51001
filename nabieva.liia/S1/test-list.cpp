@@ -219,4 +219,54 @@ BOOST_AUTO_TEST_CASE(test_insert_after_end_on_empty)
     BOOST_CHECK_EQUAL(list.back(), 42);
 }
 
+BOOST_AUTO_TEST_CASE(test_copy_constructor_makes_independent_copy)
+{
+    List< int > original;
+    original.push_back(1);
+    original.push_back(2);
+
+    List< int > copy(original);
+    original.push_front(0);
+    copy.push_back(3);
+
+    BOOST_CHECK_EQUAL(original.front(), 0);
+    BOOST_CHECK_EQUAL(original.back(), 2);
+    BOOST_CHECK_EQUAL(getSize(original), 3u);
+
+    BOOST_CHECK_EQUAL(copy.front(), 1);
+    BOOST_CHECK_EQUAL(copy.back(), 3);
+    BOOST_CHECK_EQUAL(getSize(copy), 3u);
+}
+
+BOOST_AUTO_TEST_CASE(test_copy_assignment_makes_independent_copy)
+{
+    List< int > original;
+    original.push_back(4);
+    original.push_back(5);
+
+    List< int > copy;
+    copy.push_back(100);
+    copy = original;
+
+    original.pop_front();
+
+    BOOST_CHECK_EQUAL(copy.front(), 4);
+    BOOST_CHECK_EQUAL(copy.back(), 5);
+    BOOST_CHECK_EQUAL(getSize(copy), 2u);
+    BOOST_CHECK_EQUAL(original.front(), 5);
+}
+
+BOOST_AUTO_TEST_CASE(test_self_copy_assignment)
+{
+    List< int > list;
+    list.push_back(1);
+    list.push_back(2);
+
+    list = list;
+
+    BOOST_CHECK_EQUAL(list.front(), 1);
+    BOOST_CHECK_EQUAL(list.back(), 2);
+    BOOST_CHECK_EQUAL(getSize(list), 2u);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
