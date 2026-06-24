@@ -12,12 +12,11 @@ struct NamedList
 
 
 namespace nabieva {
-   void readInput(List<NamedList>& sequences) {
+  void readInput(List<NamedList>& sequences) {
     std::string line;
     while (std::getline(std::cin, line))
     {
       if (line.empty()) continue;
-
       std::istringstream iss(line);
       std::string name;
       iss >> name;
@@ -34,6 +33,7 @@ namespace nabieva {
       }
       sequences.push_back(seq);
     }
+  }
   }
 
   nabieva::List<nabieva::List<size_t>> transposeToColumns(nabieva::List<NamedList>& sequences)
