@@ -25,6 +25,7 @@ namespace nabieva
     }
     T* operator->()
     {
+      if (!node) throw std::logic_error("dereferencing end iterator");
       return &(node->data);
     }
 
@@ -68,6 +69,7 @@ namespace nabieva
     }
     const T* operator->() const
     {
+      if (!node) throw std::logic_error("dereferencing end iterator");
       return &(node->data);
     }
 
