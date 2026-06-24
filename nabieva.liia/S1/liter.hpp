@@ -2,6 +2,7 @@
 #define LITER_HPP
 #include "node.hpp"
 #include <stdexcept>
+#include <cstddef>
 
 namespace nabieva
 {
