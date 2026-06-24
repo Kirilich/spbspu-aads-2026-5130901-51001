@@ -155,15 +155,16 @@ namespace nabieva
     {
       if (this != &other)
       {
-        clear();
-        Node<T>* current = other.head;
-        while (current)
-        {
-          push_back(current->data);
-          current = current->next;
-        }
+        List temp(other);
+        swap(temp);
       }
       return *this;
+    }
+
+    void swap(List& other) noexcept
+    {
+      swap(head, other.head);
+      swap(tail, other.tail);
     }
 
     List(List&& other) noexcept:
@@ -196,6 +197,7 @@ namespace nabieva
     {
       return LCIter<T>(nullptr);
     }
+
   };
 }
 

@@ -34,7 +34,6 @@ namespace nabieva {
       sequences.push_back(seq);
     }
   }
-  }
 
   nabieva::List<nabieva::List<size_t>> transposeToColumns(nabieva::List<NamedList>& sequences)
   {
