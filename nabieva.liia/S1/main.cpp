@@ -141,8 +141,6 @@ namespace nabieva {
 
 int main()
 {
-  std::cout << sizeof(size_t) << '\n';
-  std::cout << std::numeric_limits<size_t>::max() << '\n';
   nabieva::List<NamedList> sequences;
   try {
     readInput(sequences);
