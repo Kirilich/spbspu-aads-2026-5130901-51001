@@ -194,16 +194,6 @@ namespace nabieva
     {
       return LCIter<T>(nullptr);
     }
-
-    size_t getSize(List< T >& list)
-    {
-      std::size_t count = 0;
-      for (LIter< T > it = list.begin(); it != list.end(); ++it)
-      {
-        ++count;
-      }
-      return count;
-    }
     size_t getSize(const List< T >& list)
     {
       std::size_t count = 0;
