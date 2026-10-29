@@ -1,0 +1,4 @@
+FOOD_CATALOG 1
+2
+chicken 165 31 3.5 0 main
+vegetable_soup 40 2 1 6 soup
