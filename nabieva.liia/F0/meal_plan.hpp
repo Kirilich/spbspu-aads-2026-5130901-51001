@@ -4,6 +4,7 @@
 #include "food_catalog.hpp"
 #include "meal_commands.hpp"
 #include "nutrition.hpp"
+#include "nutrition_constants.hpp"
 
 namespace nabieva
 {
@@ -20,30 +21,22 @@ namespace nabieva
 
   struct daily_menu_t
   {
-    meal_plan_t parts_[3] = {};
+    meal_plan_t parts_[detail::mealsPerDay] = {};
     MealList meals_;
     nutrition_totals_t totals_ = {};
     double balanceScore_ = 0.0;
   };
 
-  daily_menu_t buildDailyMenu(
-    const FoodCatalog& catalog,
-    const nutrition_totals_t& goals,
-    const MealList* yesterdayMeals = nullptr);
+  daily_menu_t buildDailyMenu(const FoodCatalog& catalog, const nutrition_totals_t& goals,
+      const MealList* yesterdayMeals = nullptr);
 
-  bool wasMainDishInMeals(
-    const Food& food,
-    const MealList* yesterdayMeals);
+  bool wasMainDishInMeals(const Food& food, const MealList* yesterdayMeals);
 
-  meal_plan_t buildMealPlan(
-    const FoodCatalog& catalog,
-    const nutrition_totals_t& goals,
-    const MealList* yesterdayMeals = nullptr);
+  meal_plan_t buildMealPlan(const FoodCatalog& catalog, const nutrition_totals_t& goals,
+      const MealList* yesterdayMeals = nullptr);
 
-  MealList buildCaloriePlan(
-    const FoodCatalog& catalog,
-    const nutrition_totals_t& goals,
-    bool requireMain = false);
+  MealList buildCaloriePlan(const FoodCatalog& catalog, const nutrition_totals_t& goals,
+      bool requireMain = false);
 }
 
 #endif

@@ -9,31 +9,134 @@
 
 namespace nabieva
 {
-  template< class Key, class Value, class Compare >
-  class BSTree;
+  template< class Key, class Value, class Compare > class BSTree;
   namespace detail
   {
-    template< class Key, class Value >
-    struct TreeNode
+    template< class Key, class Value > struct TreeNode
     {
       std::pair< const Key, Value > data_;
       TreeNode* left_;
       TreeNode* right_;
       TreeNode* parent_;
       int height_;
+      static constexpr int leafHeight_ = 1;
 
-      TreeNode(const Key& key, const Value& value, TreeNode* parent) :
+      TreeNode(const Key& key, const Value& value, TreeNode* parent):
         data_(key, value),
         left_(nullptr),
         right_(nullptr),
         parent_(parent),
-        height_(1)
+        height_(leafHeight_)
       {
       }
     };
   }
-  template< class Key, class Value >
-  class TreeConstIterator
+  template< class Key, class Value > class TreeConstIterator;
+
+  template< class Key, class Value > class TreeIterator
+  {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = std::pair< const Key, Value >;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
+
+    TreeIterator():
+      node_(nullptr)
+    {
+    }
+
+    bool operator==(const TreeIterator& other) const
+    {
+      return node_ == other.node_;
+    }
+
+    bool operator!=(const TreeIterator& other) const
+    {
+      return !(*this == other);
+    }
+
+    bool operator==(const TreeConstIterator< Key, Value >& other) const
+    {
+      return TreeConstIterator< Key, Value >(*this) == other;
+    }
+
+    bool operator!=(const TreeConstIterator< Key, Value >& other) const
+    {
+      return !(*this == other);
+    }
+
+    value_type& operator*() const
+    {
+      if (node_ == nullptr)
+      {
+        throw std::out_of_range("нельзя получить значение конечного итератора.");
+      }
+
+      return node_->data_;
+    }
+
+    value_type* operator->() const
+    {
+      return &operator*();
+    }
+
+    TreeIterator& operator++()
+    {
+      if (node_ == nullptr)
+      {
+        throw std::out_of_range("нельзя передвинуть конечный итератор.");
+      }
+
+      if (node_->right_ != nullptr)
+      {
+        node_ = node_->right_;
+
+        while (node_->left_ != nullptr)
+        {
+          node_ = node_->left_;
+        }
+      }
+      else
+      {
+        Node* parent = node_->parent_;
+
+        while ((parent != nullptr) && (node_ == parent->right_))
+        {
+          node_ = parent;
+          parent = parent->parent_;
+        }
+
+        node_ = parent;
+      }
+
+      return *this;
+    }
+
+    TreeIterator operator++(int)
+    {
+      const TreeIterator previous = *this;
+      ++(*this);
+      return previous;
+    }
+
+  private:
+    template< class K, class V, class C > friend class BSTree;
+
+    friend class TreeConstIterator< Key, Value >;
+
+    using Node = detail::TreeNode< Key, Value >;
+
+    Node* node_;
+
+    explicit TreeIterator(Node* node):
+      node_(node)
+    {
+    }
+  };
+
+  template< class Key, class Value > class TreeConstIterator
   {
   public:
     using iterator_category = std::forward_iterator_tag;
@@ -42,8 +145,13 @@ namespace nabieva
     using pointer = const value_type*;
     using reference = const value_type&;
 
-    TreeConstIterator() :
+    TreeConstIterator():
       node_(nullptr)
+    {
+    }
+
+    TreeConstIterator(const TreeIterator< Key, Value >& other):
+      node_(other.node_)
     {
     }
 
@@ -112,25 +220,24 @@ namespace nabieva
     }
 
   private:
-    template< class K, class V, class C >
-    friend class BSTree;
+    template< class K, class V, class C > friend class BSTree;
 
     using Node = detail::TreeNode< Key, Value >;
 
     const Node* node_;
 
-    explicit TreeConstIterator(const Node* node) :
+    explicit TreeConstIterator(const Node* node):
       node_(node)
     {
     }
   };
 
-  template< class Key, class Value, class Compare = std::less< Key > >
-  class BSTree
+  template< class Key, class Value, class Compare = std::less< Key > > class BSTree
   {
   public:
+    using iterator = TreeIterator< Key, Value >;
     using const_iterator = TreeConstIterator< Key, Value >;
-    BSTree() :
+    BSTree():
       root_(nullptr),
       size_(0),
       compare_()
@@ -277,7 +384,7 @@ namespace nabieva
       rebalanceFrom(start);
       return true;
     }
-    Value* find(const Key& key)
+    iterator find(const Key& key)
     {
       Node* current = root_;
 
@@ -293,13 +400,13 @@ namespace nabieva
         }
         else
         {
-          return &current->data_.second;
+          return iterator(current);
         }
       }
 
-      return nullptr;
+      return end();
     }
-    const Value* find(const Key& key) const
+    const_iterator find(const Key& key) const
     {
       const Node* current = root_;
 
@@ -315,12 +422,27 @@ namespace nabieva
         }
         else
         {
-          return &current->data_.second;
+          return const_iterator(current);
         }
       }
 
-      return nullptr;
+      return end();
     }
+    iterator begin()
+    {
+      Node* current = root_;
+      while ((current != nullptr) && (current->left_ != nullptr))
+      {
+        current = current->left_;
+      }
+      return iterator(current);
+    }
+
+    iterator end()
+    {
+      return iterator(nullptr);
+    }
+
     const_iterator begin() const
     {
       const Node* current = root_;
@@ -390,8 +512,14 @@ namespace nabieva
       root_ = nullptr;
       size_ = 0;
     }
+
   private:
     using Node = detail::TreeNode< Key, Value >;
+
+    Node* root_;
+    std::size_t size_;
+    Compare compare_;
+
     static int getNodeHeight(const Node* node)
     {
       return (node == nullptr) ? 0 : node->height_;
@@ -401,7 +529,8 @@ namespace nabieva
     {
       const int left = getNodeHeight(node->left_);
       const int right = getNodeHeight(node->right_);
-      node->height_ = 1 + ((left > right) ? left : right);
+      const int nodeLevel = 1;
+      node->height_ = nodeLevel + ((left > right) ? left : right);
     }
 
     static int getBalance(const Node* node)
@@ -443,11 +572,12 @@ namespace nabieva
 
     void rebalanceFrom(Node* node)
     {
+      const int maximumBalance = 1;
       while (node != nullptr)
       {
         updateHeight(node);
         const int balance = getBalance(node);
-        if (balance > 1)
+        if (balance > maximumBalance)
         {
           if (getBalance(node->left_) < 0)
           {
@@ -455,7 +585,7 @@ namespace nabieva
           }
           node = rotateRight(node);
         }
-        else if (balance < -1)
+        else if (balance < -maximumBalance)
         {
           if (getBalance(node->right_) > 0)
           {
@@ -489,9 +619,6 @@ namespace nabieva
         newNode->parent_ = parent;
       }
     }
-    Node* root_;
-    std::size_t size_;
-    Compare compare_;
   };
 }
 

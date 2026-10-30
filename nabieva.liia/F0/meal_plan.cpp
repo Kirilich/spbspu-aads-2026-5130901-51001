@@ -7,6 +7,14 @@ namespace nabieva
 {
   namespace detail
   {
+    constexpr std::size_t firstBit = 1;
+    constexpr std::size_t binaryBase = 2;
+    constexpr std::size_t previousRowOffset = 1;
+    constexpr std::size_t firstCapacity = 1;
+    constexpr std::size_t coinSides = 2;
+    constexpr double calorieUnit = 10.0;
+    constexpr double minimumPortionFactor = 0.5;
+
     struct knapsack_cell_t
     {
       nutrition_totals_t totals_ = {};
@@ -18,13 +26,13 @@ namespace nabieva
 
   static std::size_t getCategoryMask(const Food& food)
   {
-    const std::string categories[] = { "main", "soup", "side", "dessert", "drink" };
+    const std::string categories[] = {"main", "soup", "side", "dessert", "drink"};
     const std::size_t count = 5;
     for (std::size_t index = 0; index < count; ++index)
     {
       if (food.getCategory() == categories[index])
       {
-        return std::size_t(1) << index;
+        return (detail::firstBit << index);
       }
     }
     throw std::invalid_argument("неизвестная категория блюда.");
@@ -35,29 +43,25 @@ namespace nabieva
     std::size_t count = 0;
     while (mask != 0)
     {
-      count += mask % 2;
-      mask /= 2;
+      count += mask % detail::binaryBase;
+      mask /= detail::binaryBase;
     }
     return count;
   }
 
   static nutrition_totals_t getPortionTotals(const Food& food, double grams)
   {
-    const double factor = grams / 100.0;
-    const nutrition_totals_t totals = {
-      food.getCalories() * factor, food.getProtein() * factor,
-      food.getFat() * factor, food.getCarbs() * factor
-    };
+    const double factor = grams / detail::referenceGrams;
+    const nutrition_totals_t totals = {food.getCalories() * factor, food.getProtein() * factor,
+        food.getFat() * factor, food.getCarbs() * factor};
     return totals;
   }
 
-  static nutrition_totals_t addTotals(
-    const nutrition_totals_t& first, const nutrition_totals_t& second)
+  static nutrition_totals_t addTotals(const nutrition_totals_t& first,
+      const nutrition_totals_t& second)
   {
-    const nutrition_totals_t result = {
-      first.calories_ + second.calories_, first.protein_ + second.protein_,
-      first.fat_ + second.fat_, first.carbs_ + second.carbs_
-    };
+    const nutrition_totals_t result = {first.calories_ + second.calories_,
+        first.protein_ + second.protein_, first.fat_ + second.fat_, first.carbs_ + second.carbs_};
     return result;
   }
 
@@ -65,19 +69,19 @@ namespace nabieva
   {
     const double allowance = 1e-9;
     return std::isfinite(totals.calories_) && std::isfinite(totals.protein_)
-      && std::isfinite(totals.fat_) && std::isfinite(totals.carbs_)
-      && (totals.calories_ <= goal + allowance);
+        && std::isfinite(totals.fat_) && std::isfinite(totals.carbs_)
+        && (totals.calories_ <= goal + allowance);
   }
 
-  static void assessMealPlan(
-    meal_plan_t& plan, const nutrition_totals_t& goals, const MealList* yesterdayMeals)
+  static void assessMealPlan(meal_plan_t& plan, const nutrition_totals_t& goals,
+      const MealList* yesterdayMeals)
   {
     plan.totals_ = calculateNutrition(plan.meals_);
     plan.balanceScore_ = getBalanceScore(plan.totals_, goals);
     plan.hasMainDish_ = false;
     plan.repeatsYesterday_ = false;
-    for (MealList::const_iterator current = plan.meals_.cbegin();
-      current != plan.meals_.cend(); ++current)
+    for (MealList::const_iterator current = plan.meals_.cbegin(); current != plan.meals_.cend();
+        ++current)
     {
       const Food& food = current->getFood();
       plan.hasMainDish_ = plan.hasMainDish_ || (food.getCategory() == "main");
@@ -85,8 +89,8 @@ namespace nabieva
     }
   }
 
-  static bool canReplaceFood(
-    const MealList& meals, MealList::const_iterator replaced, const Food& food)
+  static bool canReplaceFood(const MealList& meals, MealList::const_iterator replaced,
+      const Food& food)
   {
     if ((replaced->getFood().getCategory() == "main") && (food.getCategory() != "main"))
     {
@@ -103,7 +107,7 @@ namespace nabieva
   }
 
   static bool improveMealChoice(meal_plan_t& plan, const FoodCatalog& catalog,
-    const nutrition_totals_t& goals)
+      const nutrition_totals_t& goals)
   {
     const List< std::string > names = getSortedFoodNames(catalog);
     MealList::iterator bestPosition = plan.meals_.end();
@@ -116,15 +120,14 @@ namespace nabieva
     const int portionStep = 25;
     for (MealList::iterator current = plan.meals_.begin(); current != plan.meals_.end(); ++current)
     {
-      const nutrition_totals_t remaining = {
-        std::fmax(0.0, plan.totals_.calories_ - current->getCalories()),
-        std::fmax(0.0, plan.totals_.protein_ - current->getProtein()),
-        std::fmax(0.0, plan.totals_.fat_ - current->getFat()),
-        std::fmax(0.0, plan.totals_.carbs_ - current->getCarbs())
-      };
+      const nutrition_totals_t remaining = {std::fmax(0.0,
+                                                plan.totals_.calories_ - current->getCalories()),
+          std::fmax(0.0, plan.totals_.protein_ - current->getProtein()),
+          std::fmax(0.0, plan.totals_.fat_ - current->getFat()),
+          std::fmax(0.0, plan.totals_.carbs_ - current->getCarbs())};
       for (List< std::string >::const_iterator name = names.cbegin(); name != names.cend(); ++name)
       {
-        const Food* const food = catalog.find(*name);
+        const Food* const food = &catalog.find(*name)->second;
         if (!canReplaceFood(plan.meals_, current, *food))
         {
           continue;
@@ -158,12 +161,12 @@ namespace nabieva
   }
 
   static void improveMealPortions(meal_plan_t& plan, const FoodCatalog& catalog,
-    const nutrition_totals_t& goals)
+      const nutrition_totals_t& goals)
   {
     const std::size_t maximumSteps = 40;
     std::size_t steps = 0;
     while ((steps < maximumSteps) && (plan.balanceScore_ > 0.0)
-      && improveMealChoice(plan, catalog, goals))
+        && improveMealChoice(plan, catalog, goals))
     {
       ++steps;
     }
@@ -171,8 +174,8 @@ namespace nabieva
   }
 }
 
-nabieva::MealList nabieva::buildCaloriePlan(
-  const FoodCatalog& catalog, const nutrition_totals_t& goals, bool requireMain)
+nabieva::MealList nabieva::buildCaloriePlan(const FoodCatalog& catalog,
+    const nutrition_totals_t& goals, bool requireMain)
 {
   const double calorieStep = 10.0;
   const double maximumGoal = 10000.0;
@@ -196,7 +199,7 @@ nabieva::MealList nabieva::buildCaloriePlan(
   }
   const std::size_t columns = capacityLimit + 1;
   const std::size_t count = catalog.getSize();
-  if (count > maximumCells / maskCount / columns - 1)
+  if (count > maximumCells / maskCount / columns - detail::previousRowOffset)
   {
     throw std::length_error("таблица подбора рациона слишком велика.");
   }
@@ -208,16 +211,17 @@ nabieva::MealList nabieva::buildCaloriePlan(
   {
     foods = new const Food*[count]();
     std::size_t index = 0;
-    for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend(); ++current)
+    for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+        ++current)
     {
-      foods[index] = catalog.find(*current);
+      foods[index] = &catalog.find(*current)->second;
       ++index;
     }
-    for (std::size_t remaining = count; remaining > 1; --remaining)
+    for (std::size_t remaining = count; remaining > detail::previousRowOffset; --remaining)
     {
       const std::size_t chosen = getRandomIndex(remaining);
-      const Food* const temporary = foods[remaining - 1];
-      foods[remaining - 1] = foods[chosen];
+      const Food* const temporary = foods[remaining - detail::previousRowOffset];
+      foods[remaining - detail::previousRowOffset] = foods[chosen];
       foods[chosen] = temporary;
     }
     const std::size_t cells = (count + 1) * columns * maskCount;
@@ -226,16 +230,17 @@ nabieva::MealList nabieva::buildCaloriePlan(
     {
       table[capacity * maskCount].reachable_ = true;
     }
-    for (std::size_t row = 1; row <= count; ++row)
+    for (std::size_t row = detail::previousRowOffset; row <= count; ++row)
     {
-      const Food& food = *foods[row - 1];
+      const Food& food = *foods[row - detail::previousRowOffset];
       const std::size_t category = getCategoryMask(food);
       for (std::size_t capacity = 0; capacity <= capacityLimit; ++capacity)
       {
         for (std::size_t mask = 0; mask < maskCount; ++mask)
         {
           const std::size_t here = (row * columns + capacity) * maskCount + mask;
-          const std::size_t before = ((row - 1) * columns + capacity) * maskCount + mask;
+          const std::size_t before =
+              ((row - detail::previousRowOffset) * columns + capacity) * maskCount + mask;
           table[here] = table[before];
           table[here].grams_ = 0;
           table[here].previousMask_ = mask;
@@ -254,13 +259,14 @@ nabieva::MealList nabieva::buildCaloriePlan(
               continue;
             }
             const std::size_t weight =
-              static_cast< std::size_t >(std::ceil(portion.calories_ / calorieStep));
+                static_cast< std::size_t >(std::ceil(portion.calories_ / calorieStep));
             if (weight > capacity)
             {
               continue;
             }
             const detail::knapsack_cell_t& previous =
-              table[((row - 1) * columns + capacity - weight) * maskCount + mask];
+                table[((row - detail::previousRowOffset) * columns + capacity - weight) * maskCount
+                    + mask];
             if (!previous.reachable_)
             {
               continue;
@@ -271,14 +277,14 @@ nabieva::MealList nabieva::buildCaloriePlan(
               continue;
             }
             detail::knapsack_cell_t& cell =
-              table[(row * columns + capacity) * maskCount + (mask | category)];
+                table[(row * columns + capacity) * maskCount + (mask | category)];
             bool better = !cell.reachable_ || (candidate.calories_ > cell.totals_.calories_);
             if (cell.reachable_ && (candidate.calories_ == cell.totals_.calories_))
             {
               const double score = getBalanceScore(candidate, goals);
               const double previousScore = getBalanceScore(cell.totals_, goals);
               better = (score < previousScore)
-                || ((score == previousScore) && (getRandomIndex(2) == 0));
+                  || ((score == previousScore) && (getRandomIndex(detail::coinSides) == 0));
             }
             if (better)
             {
@@ -295,12 +301,12 @@ nabieva::MealList nabieva::buildCaloriePlan(
     std::size_t bestCapacity = 0;
     double bestScore = getBalanceScore(empty, goals);
     double bestCalories = 0.0;
-    for (std::size_t capacity = 1; capacity <= capacityLimit; ++capacity)
+    for (std::size_t capacity = detail::firstCapacity; capacity <= capacityLimit; ++capacity)
     {
-      for (std::size_t mask = 1; mask < maskCount; ++mask)
+      for (std::size_t mask = detail::firstBit; mask < maskCount; ++mask)
       {
         const detail::knapsack_cell_t& cell =
-          table[(count * columns + capacity) * maskCount + mask];
+            table[(count * columns + capacity) * maskCount + mask];
         if (!cell.reachable_ || (requireMain && ((mask & mainMask) == 0)))
         {
           continue;
@@ -308,9 +314,9 @@ nabieva::MealList nabieva::buildCaloriePlan(
         const double score = getBalanceScore(cell.totals_, goals);
         const bool betterCalories = cell.totals_.calories_ > bestCalories;
         const bool moreCategories = (cell.totals_.calories_ == bestCalories)
-          && (countCategories(mask) > countCategories(bestMask));
+            && (countCategories(mask) > countCategories(bestMask));
         if ((bestMask == 0) || (score < bestScore)
-          || ((score == bestScore) && (betterCalories || moreCategories)))
+            || ((score == bestScore) && (betterCalories || moreCategories)))
         {
           bestMask = mask;
           bestCapacity = capacity;
@@ -322,10 +328,10 @@ nabieva::MealList nabieva::buildCaloriePlan(
     for (std::size_t row = count; (row > 0) && (bestMask != 0); --row)
     {
       const detail::knapsack_cell_t& cell =
-        table[(row * columns + bestCapacity) * maskCount + bestMask];
+          table[(row * columns + bestCapacity) * maskCount + bestMask];
       if (cell.grams_ != 0)
       {
-        const Food& food = *foods[row - 1];
+        const Food& food = *foods[row - detail::previousRowOffset];
         result.pushFront(Meal(food, cell.grams_));
         const double calories = getPortionTotals(food, cell.grams_).calories_;
         bestCapacity -= static_cast< std::size_t >(std::ceil(calories / calorieStep));
@@ -344,11 +350,9 @@ nabieva::MealList nabieva::buildCaloriePlan(
   return result;
 }
 
-bool nabieva::wasMainDishInMeals(
-  const Food& food, const MealList* yesterdayMeals)
+bool nabieva::wasMainDishInMeals(const Food& food, const MealList* yesterdayMeals)
 {
-  if ((food.getCategory() != "main")
-    && (food.getCategory() != "soup"))
+  if ((food.getCategory() != "main") && (food.getCategory() != "soup"))
   {
     return false;
   }
@@ -359,7 +363,7 @@ bool nabieva::wasMainDishInMeals(
   }
 
   for (MealList::const_iterator current = yesterdayMeals->cbegin();
-    current != yesterdayMeals->cend(); ++current)
+      current != yesterdayMeals->cend(); ++current)
   {
     if (current->getFood().getName() == food.getName())
     {
@@ -370,10 +374,8 @@ bool nabieva::wasMainDishInMeals(
   return false;
 }
 
-nabieva::meal_plan_t nabieva::buildMealPlan(
-  const FoodCatalog& catalog,
-  const nutrition_totals_t& goals,
-  const MealList* yesterdayMeals)
+nabieva::meal_plan_t nabieva::buildMealPlan(const FoodCatalog& catalog,
+    const nutrition_totals_t& goals, const MealList* yesterdayMeals)
 {
   const nutrition_totals_t emptyTotals = {};
   getBalanceScore(emptyTotals, goals);
@@ -387,15 +389,15 @@ nabieva::meal_plan_t nabieva::buildMealPlan(
   bool freshMainFits = false;
   bool anyMainFits = false;
 
-  for (List< std::string >::const_iterator current = names.cbegin();
-    current != names.cend(); ++current)
+  for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+      ++current)
   {
-    const Food* const food = catalog.find(*current);
-    const double portionUnits =
-      std::max(1.0, std::ceil(food->getCalories() * 0.5 / 10.0));
-    const double goalUnits = std::floor(goals.calories_ / 10.0);
-    const bool mainFits = (food->getCategory() == "main")
-      && (food->getCalories() > 0.0) && (portionUnits <= goalUnits);
+    const Food* const food = &catalog.find(*current)->second;
+    const double portionUnits = std::max(static_cast< double >(detail::firstCapacity),
+        std::ceil(food->getCalories() * detail::minimumPortionFactor / detail::calorieUnit));
+    const double goalUnits = std::floor(goals.calories_ / detail::calorieUnit);
+    const bool mainFits = (food->getCategory() == "main") && (food->getCalories() > 0.0)
+        && (portionUnits <= goalUnits);
 
     anyMainFits = anyMainFits || mainFits;
 
@@ -412,8 +414,7 @@ nabieva::meal_plan_t nabieva::buildMealPlan(
 
   meal_plan_t result = {};
 
-  result.meals_ = buildCaloriePlan(
-    preferredCatalog, goals, freshMainFits);
+  result.meals_ = buildCaloriePlan(preferredCatalog, goals, freshMainFits);
 
   assessMealPlan(result, goals, yesterdayMeals);
   improveMealPortions(result, preferredCatalog, goals);
@@ -426,8 +427,7 @@ nabieva::meal_plan_t nabieva::buildMealPlan(
 
   meal_plan_t fallback = {};
 
-  fallback.meals_ = buildCaloriePlan(
-    catalog, goals, anyMainFits);
+  fallback.meals_ = buildCaloriePlan(catalog, goals, anyMainFits);
 
   assessMealPlan(fallback, goals, yesterdayMeals);
   improveMealPortions(fallback, catalog, goals);
@@ -442,11 +442,8 @@ nabieva::meal_plan_t nabieva::buildMealPlan(
 }
 namespace nabieva
 {
-  static meal_plan_t buildNextMeal(
-    const FoodCatalog& catalog,
-    const nutrition_totals_t& goals,
-    const MealList* yesterdayMeals,
-    const MealList& todayMeals)
+  static meal_plan_t buildNextMeal(const FoodCatalog& catalog, const nutrition_totals_t& goals,
+      const MealList* yesterdayMeals, const MealList& todayMeals)
   {
     const std::size_t bucketCount = 16;
     FoodCatalog preferredCatalog(bucketCount);
@@ -455,10 +452,10 @@ namespace nabieva
 
     bool excludedFood = false;
 
-    for (List< std::string >::const_iterator current = names.cbegin();
-      current != names.cend(); ++current)
+    for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+        ++current)
     {
-      const Food* const food = catalog.find(*current);
+      const Food* const food = &catalog.find(*current)->second;
 
       if (wasMainDishInMeals(*food, &todayMeals))
       {
@@ -470,14 +467,11 @@ namespace nabieva
       }
     }
 
-    meal_plan_t result = buildMealPlan(
-      preferredCatalog, goals, yesterdayMeals);
+    meal_plan_t result = buildMealPlan(preferredCatalog, goals, yesterdayMeals);
 
-    if (excludedFood
-      && (!result.hasMainDish_ || result.meals_.isEmpty()))
+    if (excludedFood && (!result.hasMainDish_ || result.meals_.isEmpty()))
     {
-      meal_plan_t fallback = buildMealPlan(
-        catalog, goals, yesterdayMeals);
+      const meal_plan_t fallback = buildMealPlan(catalog, goals, yesterdayMeals);
 
       if (fallback.hasMainDish_ || result.meals_.isEmpty())
       {
@@ -487,8 +481,8 @@ namespace nabieva
 
     result.repeatsToday_ = false;
 
-    for (MealList::const_iterator current = result.meals_.cbegin();
-      current != result.meals_.cend(); ++current)
+    for (MealList::const_iterator current = result.meals_.cbegin(); current != result.meals_.cend();
+        ++current)
     {
       if (wasMainDishInMeals(current->getFood(), &todayMeals))
       {
@@ -499,35 +493,29 @@ namespace nabieva
     return result;
   }
 }
-nabieva::daily_menu_t nabieva::buildDailyMenu(
-  const FoodCatalog& catalog,
-  const nutrition_totals_t& goals,
-  const MealList* yesterdayMeals)
+nabieva::daily_menu_t nabieva::buildDailyMenu(const FoodCatalog& catalog,
+    const nutrition_totals_t& goals, const MealList* yesterdayMeals)
 {
-  const double shares[3] = { 0.30, 0.40, 0.30 };
+  const double shares[detail::mealsPerDay] = {0.30, 0.40, 0.30};
   daily_menu_t result = {};
   MealList::iterator last = result.meals_.end();
 
-  for (std::size_t index = 0; index < 3; ++index)
+  for (std::size_t index = 0; index < detail::mealsPerDay; ++index)
   {
-    const nutrition_totals_t partGoals = {
-      goals.calories_ * shares[index],
-      goals.protein_ * shares[index],
-      goals.fat_ * shares[index],
-      goals.carbs_ * shares[index]
-    };
+    const nutrition_totals_t partGoals = {goals.calories_ * shares[index],
+        goals.protein_ * shares[index], goals.fat_ * shares[index], goals.carbs_ * shares[index]};
 
     const std::size_t bucketCount = 16;
     FoodCatalog availableCatalog(bucketCount);
 
     const List< std::string > names = catalog.getKeys();
 
-    for (List< std::string >::const_iterator current = names.cbegin();
-      current != names.cend(); ++current)
+    for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+        ++current)
     {
-      const Food* const food = catalog.find(*current);
+      const Food* const food = &catalog.find(*current)->second;
 
-      if ((food->getCategory() == "soup") && (index != 1))
+      if ((food->getCategory() == "soup") && (index != detail::lunchIndex))
       {
         continue;
       }
@@ -535,13 +523,13 @@ nabieva::daily_menu_t nabieva::buildDailyMenu(
       availableCatalog.add(food->getName(), *food);
     }
 
-    result.parts_[index] = buildNextMeal(
-      availableCatalog, partGoals, yesterdayMeals, result.meals_);
+    result.parts_[index] =
+        buildNextMeal(availableCatalog, partGoals, yesterdayMeals, result.meals_);
 
     const MealList& portions = result.parts_[index].meals_;
 
-    for (MealList::const_iterator current = portions.cbegin();
-      current != portions.cend(); ++current)
+    for (MealList::const_iterator current = portions.cbegin(); current != portions.cend();
+        ++current)
     {
       if (result.meals_.isEmpty())
       {

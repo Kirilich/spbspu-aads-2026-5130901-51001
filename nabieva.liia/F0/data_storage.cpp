@@ -1,13 +1,24 @@
 #include "data_storage.hpp"
+#include <cctype>
 #include <cerrno>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
 #include <limits>
 #include <locale>
 #include <stdexcept>
-#include "input.hpp"
 #include "nutrition.hpp"
+#include "profile.hpp"
+
+namespace nabieva
+{
+  namespace detail
+  {
+    constexpr int profilePresent = 1;
+    constexpr std::size_t separatorWidth = 1;
+  }
+}
 
 namespace nabieva
 {
@@ -49,9 +60,10 @@ namespace nabieva
 
   static std::size_t readCount(std::istream& input)
   {
-    const std::string word = readWord(input);
     std::size_t count = 0;
-    if ((word != "0") && !readPositiveInteger(word, count))
+    input >> std::ws;
+    if (!std::isdigit(input.peek()) || !(input >> count)
+        || (!input.eof() && !std::isspace(input.peek())))
     {
       throw std::invalid_argument("неверное количество записей.");
     }
@@ -61,7 +73,7 @@ namespace nabieva
   static double readValue(std::istream& input)
   {
     double value = 0.0;
-    if (!readNumber(readWord(input), value))
+    if (!(input >> value) || !std::isfinite(value) || (!input.eof() && !std::isspace(input.peek())))
     {
       throw std::invalid_argument("неверное число в файле данных.");
     }
@@ -94,7 +106,7 @@ namespace nabieva
     {
       return;
     }
-    if (present != 1)
+    if (present != detail::profilePresent)
     {
       throw std::invalid_argument("неверный признак наличия профиля.");
     }
@@ -155,7 +167,7 @@ namespace nabieva
     {
       const Date date = parseDate(readWord(input));
       const std::size_t count = readCount(input);
-      if ((count == 0) || (diary.find(date) != nullptr))
+      if ((count == 0) || (diary.find(date) != diary.end()))
       {
         throw std::invalid_argument("день дневника пуст или повторяется.");
       }
@@ -184,32 +196,35 @@ namespace nabieva
   }
 
   static void writeSnapshot(std::ostream& output, const Profile& profile,
-    const FoodCatalog& catalog, const WeightHistory& history, const FoodDiary& diary)
+      const FoodCatalog& catalog, const WeightHistory& history, const FoodDiary& diary)
   {
     output.imbue(std::locale::classic());
     output << std::setprecision(std::numeric_limits< double >::max_digits10);
-    output << "FITNESS_DATA 1\nPROFILE " << (profile.hasData() ? 1 : 0) << '\n';
+    output << "FITNESS_DATA 1\nPROFILE " << (profile.hasData() ? detail::profilePresent : 0)
+           << '\n';
 
     if (profile.hasData())
     {
       const profile_data_t data = profile.getInputData();
       output << data.name_ << ' ' << data.currentWeight_ << ' ' << data.targetWeight_ << ' ';
-      output << data.sex_ << ' ' << data.age_ << ' ' << data.height_ << ' ' << data.activity_ << ' ';
-      output << data.calories_ << ' ' << data.protein_ << ' ' << data.fat_ << ' ' << data.carbs_ << '\n';
+      output << data.sex_ << ' ' << data.age_ << ' ' << data.height_ << ' ' << data.activity_
+             << ' ';
+      output << data.calories_ << ' ' << data.protein_ << ' ' << data.fat_ << ' ' << data.carbs_
+             << '\n';
     }
 
     output << "FOODS " << catalog.getSize() << '\n';
     const List< std::string > names = catalog.getKeys();
-    for (List< std::string >::const_iterator current = names.cbegin();
-      current != names.cend(); ++current)
+    for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+        ++current)
     {
-      writeFood(output, *catalog.find(*current));
+      writeFood(output, catalog.find(*current)->second);
       output << '\n';
     }
 
     output << "WEIGHTS " << history.getSize() << '\n';
-    for (WeightHistory::const_iterator current = history.cbegin();
-      current != history.cend(); ++current)
+    for (WeightHistory::const_iterator current = history.cbegin(); current != history.cend();
+        ++current)
     {
       output << current->first.getText() << ' ' << current->second << '\n';
     }
@@ -241,11 +256,11 @@ std::string nabieva::getDataFilePath(const std::string& programPath)
   {
     return "data/tracker.txt";
   }
-  return programPath.substr(0, separator + 1) + "data/tracker.txt";
+  return programPath.substr(0, separator + detail::separatorWidth) + "data/tracker.txt";
 }
 
-bool nabieva::loadData(const std::string& filePath, Profile& profile,
-  FoodCatalog& catalog, WeightHistory& history, FoodDiary& diary)
+bool nabieva::loadData(const std::string& filePath, Profile& profile, FoodCatalog& catalog,
+    WeightHistory& history, FoodDiary& diary)
 {
   std::string sourcePath = filePath;
   if (!fileExists(sourcePath))
@@ -300,7 +315,7 @@ bool nabieva::loadData(const std::string& filePath, Profile& profile,
 }
 
 void nabieva::saveData(const std::string& filePath, const Profile& profile,
-  const FoodCatalog& catalog, const WeightHistory& history, const FoodDiary& diary)
+    const FoodCatalog& catalog, const WeightHistory& history, const FoodDiary& diary)
 {
   const std::string temporaryPath = filePath + ".tmp";
   const std::string backupPath = filePath + ".bak";
@@ -334,7 +349,8 @@ void nabieva::saveData(const std::string& filePath, const Profile& profile,
   {
     if (hadPreviousFile && (std::rename(backupPath.c_str(), filePath.c_str()) != 0))
     {
-      throw std::runtime_error("не удалось сохранить данные. предыдущая версия находится в tracker.txt.bak.");
+      throw std::runtime_error(
+          "не удалось сохранить данные. предыдущая версия находится в tracker.txt.bak.");
     }
     throw std::runtime_error("не удалось заменить файл данных.");
   }

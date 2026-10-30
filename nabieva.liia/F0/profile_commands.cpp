@@ -1,66 +1,79 @@
 #include "profile_commands.hpp"
+#include <cctype>
+#include <cmath>
+#include <istream>
+#include <string>
 #include <stdexcept>
-#include "input.hpp"
+#include "application_commands.hpp"
 #include "profile.hpp"
+#include "nutrition_constants.hpp"
 
-void nabieva::setProfileFromCommand(Profile& profile, const std::string& line, std::size_t position)
+nabieva::CommandResult nabieva::setProfileFromCommand(std::istream& input,
+    command_context_t& context, std::ostream&)
 {
-  const std::size_t requiredCount = 7;
-  const std::size_t maximumCount = 11;
+  profile_data_t data = {};
 
-  std::string arguments[maximumCount] = {};
-  std::size_t count = 0;
-
-  while ((count < maximumCount)
-    && nabieva::readToken(line, position, arguments[count]))
+  if (!(input >> data.name_ >> data.currentWeight_) || !std::isspace(input.peek())
+      || !(input >> data.targetWeight_) || !std::isspace(input.peek()) || !(input >> data.sex_))
   {
-    ++count;
+    throw std::invalid_argument("неверное имя, вес или пол.");
   }
 
-  std::string extra = "";
-
-  bool valid = (count >= requiredCount)
-    && !nabieva::readToken(line, position, extra);
-
-  nabieva::profile_data_t data = {};
-
-  if (valid)
+  input >> std::ws;
+  if (!std::isdigit(input.peek()) || !(input >> data.age_) || !std::isspace(input.peek())
+      || !(input >> data.height_) || !std::isspace(input.peek()) || !(input >> data.activity_)
+      || (!input.eof() && !std::isspace(input.peek())))
   {
-    data.name_ = arguments[0];
-    data.sex_ = arguments[3];
-
-    valid = nabieva::readNumber(arguments[1], data.currentWeight_)
-      && nabieva::readNumber(arguments[2], data.targetWeight_)
-      && nabieva::readPositiveInteger(arguments[4], data.age_)
-      && nabieva::readNumber(arguments[5], data.height_)
-      && nabieva::readNumber(arguments[6], data.activity_);
+    throw std::invalid_argument("неверный возраст, рост или активность.");
   }
 
-  double goals[4] = {};
-
-  for (std::size_t index = 0; valid && (index < 4); ++index)
+  double goals[detail::nutritionValueCount] = {};
+  for (std::size_t index = 0; index < detail::nutritionValueCount; ++index)
   {
-    const std::size_t argument = requiredCount + index;
-
-    if ((argument < count) && (arguments[argument] != "auto"))
+    std::string text = "";
+    if (!(input >> text))
     {
-      valid = nabieva::readNumber(arguments[argument], goals[index])
-        && (goals[index] > 0.0);
+      break;
+    }
+    if (text == "auto")
+    {
+      continue;
+    }
+
+    std::size_t processed = 0;
+    goals[index] = std::stod(text, &processed);
+    if ((processed != text.size()) || !std::isfinite(goals[index]) || (goals[index] <= 0.0))
+    {
+      throw std::invalid_argument("неверная цель питания.");
     }
   }
 
-  if (valid)
+  std::string extra = "";
+  if (input >> extra)
   {
-    data.calories_ = goals[0];
-    data.protein_ = goals[1];
-    data.fat_ = goals[2];
-    data.carbs_ = goals[3];
-
-    valid = profile.setProfile(data);
+    throw std::invalid_argument("лишние параметры профиля.");
   }
 
-  if (!valid)
+  data.calories_ = goals[0];
+  data.protein_ = goals[detail::proteinIndex];
+  data.fat_ = goals[detail::fatIndex];
+  data.carbs_ = goals[detail::carbsIndex];
+  if (!context.profile_.setProfile(data))
   {
     throw std::invalid_argument("неверные параметры профиля.");
   }
+  return CommandResult::profileChanged;
+}
+
+nabieva::CommandResult nabieva::showProfile(std::istream& input, command_context_t& context,
+    std::ostream& output)
+{
+  std::string extra = "";
+  if (input >> extra)
+  {
+    throw std::invalid_argument("лишние параметры команды.");
+  }
+
+  context.profile_.printProfile(output, getCurrentWeight(context.profile_, context.history_));
+  return CommandResult::unchanged;
 }

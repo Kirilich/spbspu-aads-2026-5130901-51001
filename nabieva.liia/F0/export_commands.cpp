@@ -1,20 +1,23 @@
 #include "export_commands.hpp"
 #include <fstream>
+#include <istream>
 #include <ostream>
 #include <stdexcept>
-#include "input.hpp"
+#include "application_commands.hpp"
 #include "nutrition.hpp"
 #include "stats_commands.hpp"
 
-void nabieva::exportReport(const Profile& profile, const WeightHistory& history,
-  const FoodDiary& diary, const std::string& line, std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::exportReport(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  const Profile& profile = context.profile_;
+  const WeightHistory& history = context.history_;
+  const FoodDiary& diary = context.diary_;
   std::string firstText = "";
   std::string lastText = "";
   std::string extra = "";
 
-  if (!readToken(line, position, firstText) || !readToken(line, position, lastText)
-    || readToken(line, position, extra))
+  if (!(input >> firstText) || !(input >> lastText) || (input >> extra))
   {
     throw std::invalid_argument("для экспорта нужны две даты.");
   }
@@ -30,17 +33,17 @@ void nabieva::exportReport(const Profile& profile, const WeightHistory& history,
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return;
+    return CommandResult::unchanged;
   }
   Date currentDate = firstDate;
 
   while (true)
   {
-    const MealList* const meals = diary.find(currentDate);
+    const FoodDiary::const_iterator day = diary.find(currentDate);
 
-    if (meals != nullptr)
+    if (day != diary.end())
     {
-      calculateNutrition(*meals);
+      calculateNutrition(day->second);
     }
 
     if (currentDate == lastDate)
@@ -68,14 +71,13 @@ void nabieva::exportReport(const Profile& profile, const WeightHistory& history,
   {
     file << '\n' << std::string(separatorWidth, '-') << '\n';
 
-    const std::string dateText = currentDate.getText();
-    showDayStats(profile, history, diary, dateText, 0, file);
+    printDayStats(profile, history, diary, currentDate, file);
 
-    const double* const recordedWeight = history.find(currentDate);
+    const WeightHistory::const_iterator recordedWeight = history.find(currentDate);
 
-    if (recordedWeight != nullptr)
+    if (recordedWeight != history.end())
     {
-      file << "вес, записанный на эту дату: " << *recordedWeight << " кг\n";
+      file << "вес, записанный на эту дату: " << recordedWeight->second << " кг\n";
     }
     else
     {
@@ -83,7 +85,7 @@ void nabieva::exportReport(const Profile& profile, const WeightHistory& history,
     }
 
     file << '\n';
-    listMeals(diary, dateText, 0, file);
+    printMeals(diary, currentDate, file);
 
     if (!file)
     {
@@ -106,4 +108,5 @@ void nabieva::exportReport(const Profile& profile, const WeightHistory& history,
   }
 
   output << "отчёт сохранён в " << fileName << '\n';
+  return CommandResult::unchanged;
 }

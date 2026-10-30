@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <functional>
 #include <limits>
+#include <iterator>
 #include <stdexcept>
 #include <utility>
 #include "list.hpp"
@@ -11,11 +12,103 @@
 namespace nabieva
 {
   template< class Key, class Value, class Hash = std::hash< Key >,
-    class Equal = std::equal_to< Key > >
+      class Equal = std::equal_to< Key > >
   class HashTable
   {
   public:
-    explicit HashTable(std::size_t bucketCount) :
+    class ConstIterator
+    {
+    public:
+      using iterator_category = std::forward_iterator_tag;
+      using value_type = std::pair< const Key, Value >;
+      using difference_type = std::ptrdiff_t;
+      using pointer = const value_type*;
+      using reference = const value_type&;
+
+      ConstIterator():
+        buckets_(nullptr),
+        bucketCount_(0),
+        bucketIndex_(0),
+        position_()
+      {
+      }
+
+      bool operator==(const ConstIterator& other) const
+      {
+        return (buckets_ == other.buckets_) && (bucketIndex_ == other.bucketIndex_)
+            && (position_ == other.position_);
+      }
+
+      bool operator!=(const ConstIterator& other) const
+      {
+        return !(*this == other);
+      }
+
+      const value_type& operator*() const
+      {
+        if (bucketIndex_ == bucketCount_)
+        {
+          throw std::out_of_range("нельзя получить значение конечного итератора.");
+        }
+        return *position_;
+      }
+
+      const value_type* operator->() const
+      {
+        return &operator*();
+      }
+
+      ConstIterator& operator++()
+      {
+        if (bucketIndex_ == bucketCount_)
+        {
+          throw std::out_of_range("нельзя передвинуть конечный итератор.");
+        }
+
+        ++position_;
+        while (position_ == buckets_[bucketIndex_].cend())
+        {
+          ++bucketIndex_;
+          if (bucketIndex_ == bucketCount_)
+          {
+            break;
+          }
+          position_ = buckets_[bucketIndex_].cbegin();
+        }
+        return *this;
+      }
+
+      ConstIterator operator++(int)
+      {
+        const ConstIterator previous = *this;
+        ++(*this);
+        return previous;
+      }
+
+    private:
+      friend class HashTable;
+      using Bucket = List< value_type >;
+
+      const Bucket* buckets_;
+      std::size_t bucketCount_;
+      std::size_t bucketIndex_;
+      typename Bucket::const_iterator position_;
+
+      ConstIterator(const Bucket* buckets, std::size_t bucketCount, std::size_t bucketIndex,
+          typename Bucket::const_iterator position):
+        buckets_(buckets),
+        bucketCount_(bucketCount),
+        bucketIndex_(bucketIndex),
+        position_(position)
+      {
+      }
+    };
+
+    using const_iterator = ConstIterator;
+
+    HashTable(const HashTable& other) = delete;
+
+    explicit HashTable(std::size_t bucketCount):
       buckets_(nullptr),
       bucketCount_(bucketCount),
       size_(0),
@@ -29,8 +122,6 @@ namespace nabieva
 
       buckets_ = new Bucket[bucketCount_];
     }
-
-    HashTable(const HashTable& other) = delete;
 
     ~HashTable()
     {
@@ -71,7 +162,7 @@ namespace nabieva
       for (std::size_t index = 0; index < bucketCount_; ++index)
       {
         for (typename Bucket::const_iterator current = buckets_[index].cbegin();
-          current != buckets_[index].cend(); ++current)
+            current != buckets_[index].cend(); ++current)
         {
           const std::size_t destination = prepared.hash_(current->first) % bucketCount;
           prepared.buckets_[destination].pushFront(*current);
@@ -84,24 +175,27 @@ namespace nabieva
 
     bool add(const Key& key, const Value& value)
     {
-      if (has(key))
+      std::size_t index = hash_(key) % bucketCount_;
+      if (findInBucket(key, index) != buckets_[index].cend())
       {
         return false;
       }
 
       const Entry prepared(key, value);
-      const std::size_t maximum = std::numeric_limits< std::size_t >::max();
-      const std::size_t limit = bucketCount_ - bucketCount_ / 4;
-      if ((size_ == maximum) || ((size_ >= limit) && (bucketCount_ > maximum / 2)))
+      constexpr std::size_t maximum = std::numeric_limits< std::size_t >::max();
+      const std::size_t loadDivisor = 4;
+      const std::size_t growthFactor = 2;
+      const std::size_t limit = bucketCount_ - bucketCount_ / loadDivisor;
+      if ((size_ == maximum) || ((size_ >= limit) && (bucketCount_ > maximum / growthFactor)))
       {
         throw std::length_error("хэш-таблица слишком велика.");
       }
       if (size_ >= limit)
       {
-        rehash(bucketCount_ * 2);
+        rehash(bucketCount_ * growthFactor);
+        index = hash_(prepared.first) % bucketCount_;
       }
 
-      const std::size_t index = hash_(prepared.first) % bucketCount_;
       buckets_[index].pushFront(prepared);
       ++size_;
       return true;
@@ -142,28 +236,47 @@ namespace nabieva
 
       return false;
     }
-    const Value* find(const Key& key) const
+    ConstIterator find(const Key& key) const
     {
       const std::size_t index = hash_(key) % bucketCount_;
-      const Bucket& bucket = buckets_[index];
-      typename Bucket::const_iterator position = bucket.cbegin();
-
-      while (position != bucket.cend())
+      const typename Bucket::const_iterator position = findInBucket(key, index);
+      if (position == buckets_[index].cend())
       {
-        if (equal_(position->first, key))
-        {
-          return &position->second;
-        }
-
-        ++position;
+        return end();
       }
-
-      return nullptr;
+      return ConstIterator(buckets_, bucketCount_, index, position);
     }
 
     bool has(const Key& key) const
     {
-      return find(key) != nullptr;
+      return find(key) != end();
+    }
+
+    ConstIterator begin() const
+    {
+      for (std::size_t index = 0; index < bucketCount_; ++index)
+      {
+        if (!buckets_[index].isEmpty())
+        {
+          return ConstIterator(buckets_, bucketCount_, index, buckets_[index].cbegin());
+        }
+      }
+      return end();
+    }
+
+    ConstIterator end() const
+    {
+      return ConstIterator(buckets_, bucketCount_, bucketCount_, typename Bucket::const_iterator());
+    }
+
+    ConstIterator cbegin() const
+    {
+      return begin();
+    }
+
+    ConstIterator cend() const
+    {
+      return end();
     }
 
     List< Key > getKeys() const
@@ -184,6 +297,7 @@ namespace nabieva
 
       return keys;
     }
+
   private:
     using Entry = std::pair< const Key, Value >;
     using Bucket = List< Entry >;
@@ -193,6 +307,21 @@ namespace nabieva
     std::size_t size_;
     Hash hash_;
     Equal equal_;
+
+    typename Bucket::const_iterator findInBucket(const Key& key, std::size_t index) const
+    {
+      const Bucket& bucket = buckets_[index];
+      typename Bucket::const_iterator position = bucket.cbegin();
+      while (position != bucket.cend())
+      {
+        if (equal_(position->first, key))
+        {
+          return position;
+        }
+        ++position;
+      }
+      return bucket.cend();
+    }
   };
 }
 

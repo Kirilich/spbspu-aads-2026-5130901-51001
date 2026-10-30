@@ -3,10 +3,11 @@
 
 #include "list.hpp"
 #include "meal.hpp"
-#include "profile.hpp"
 
 namespace nabieva
 {
+  class Profile;
+
   struct nutrition_totals_t
   {
     double calories_;
@@ -19,11 +20,9 @@ namespace nabieva
 
   double getDeviation(double value, double goal);
 
-  double getBalanceScore(const nutrition_totals_t& totals,
-    const nutrition_totals_t& goals);
+  double getBalanceScore(const nutrition_totals_t& totals, const nutrition_totals_t& goals);
 
-  double getBalanceScore(const nutrition_totals_t& totals,
-    const Profile& profile);
+  double getBalanceScore(const nutrition_totals_t& totals, const Profile& profile);
 }
 
 #endif

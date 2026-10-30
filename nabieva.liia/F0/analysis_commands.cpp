@@ -1,19 +1,27 @@
 #include "analysis_commands.hpp"
-#include "random_choice.hpp"
-#include "console.hpp"
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <istream>
 #include <ostream>
 #include <stdexcept>
-#include <algorithm>
-#include "input.hpp"
-#include "nutrition.hpp"
+#include "application_commands.hpp"
+#include "console.hpp"
 #include "meal_plan.hpp"
+#include "nutrition.hpp"
+#include "random_choice.hpp"
+#include "nutrition_constants.hpp"
 
 namespace nabieva
 {
   namespace detail
   {
+    constexpr std::size_t indicatorWidth = 15;
+    constexpr int numericWidth = 14;
+    constexpr int defaultPrecision = 6;
+    constexpr int firstCalendarValue = 1;
+    constexpr double targetRatio = 1.0;
+
     struct reduction_t
     {
       std::size_t number_;
@@ -41,15 +49,11 @@ namespace nabieva
 
     return after / goal <= upperBound + roundingAllowance;
   }
-  static bool canAddMeal(
-    const nutrition_totals_t& before,
-    const nutrition_totals_t& after,
-    const Profile& profile)
+  static bool canAddMeal(const nutrition_totals_t& before, const nutrition_totals_t& after,
+      const Profile& profile)
   {
-    if (!std::isfinite(after.calories_)
-      || !std::isfinite(after.protein_)
-      || !std::isfinite(after.fat_)
-      || !std::isfinite(after.carbs_))
+    if (!std::isfinite(after.calories_) || !std::isfinite(after.protein_)
+        || !std::isfinite(after.fat_) || !std::isfinite(after.carbs_))
     {
       return false;
     }
@@ -57,16 +61,10 @@ namespace nabieva
     const double roundingAllowance = 1e-9;
 
     return (after.calories_ / profile.getDailyCaloriesGoal()
-      <= 1.0 + roundingAllowance)
-      && keepsUpperBound(
-        before.protein_, after.protein_,
-        profile.getDailyProteinGoal())
-      && keepsUpperBound(
-        before.fat_, after.fat_,
-        profile.getDailyFatGoal())
-      && keepsUpperBound(
-        before.carbs_, after.carbs_,
-        profile.getDailyCarbsGoal());
+               <= detail::targetRatio + roundingAllowance)
+        && keepsUpperBound(before.protein_, after.protein_, profile.getDailyProteinGoal())
+        && keepsUpperBound(before.fat_, after.fat_, profile.getDailyFatGoal())
+        && keepsUpperBound(before.carbs_, after.carbs_, profile.getDailyCarbsGoal());
   }
   static detail::Reductions copyMeals(const MealList& meals)
   {
@@ -74,16 +72,11 @@ namespace nabieva
     detail::Reductions::iterator last = result.end();
     std::size_t number = 0;
 
-    for (MealList::const_iterator current = meals.cbegin();
-      current != meals.cend(); ++current)
+    for (MealList::const_iterator current = meals.cbegin(); current != meals.cend(); ++current)
     {
       ++number;
 
-      const detail::reduction_t entry = {
-        number,
-        *current,
-        0
-      };
+      const detail::reduction_t entry = {number, *current, 0};
 
       if (result.isEmpty())
       {
@@ -98,17 +91,14 @@ namespace nabieva
 
     return result;
   }
-  static nutrition_totals_t removeOnePart(
-    const nutrition_totals_t& totals, const Meal& meal)
+  static nutrition_totals_t removeOnePart(const nutrition_totals_t& totals, const Meal& meal)
   {
-    const double parts = static_cast<double>(detail::portionParts);
+    const double parts = static_cast< double >(detail::portionParts);
 
-    const nutrition_totals_t result = {
-      std::max(0.0, totals.calories_ - meal.getCalories() / parts),
-      std::max(0.0, totals.protein_ - meal.getProtein() / parts),
-      std::max(0.0, totals.fat_ - meal.getFat() / parts),
-      std::max(0.0, totals.carbs_ - meal.getCarbs() / parts)
-    };
+    const nutrition_totals_t result = {std::max(0.0, totals.calories_ - meal.getCalories() / parts),
+        std::max(0.0, totals.protein_ - meal.getProtein() / parts),
+        std::max(0.0, totals.fat_ - meal.getFat() / parts),
+        std::max(0.0, totals.carbs_ - meal.getCarbs() / parts)};
 
     return result;
   }
@@ -117,47 +107,33 @@ namespace nabieva
     const double lowerBound = goal * 0.90;
     const double roundingAllowance = goal * 1e-9;
 
-    return after + roundingAllowance
-      >= std::min(before, lowerBound);
+    return after + roundingAllowance >= std::min(before, lowerBound);
   }
 
-  static bool keepsLowerBounds(
-    const nutrition_totals_t& before,
-    const nutrition_totals_t& after,
-    const Profile& profile)
+  static bool keepsLowerBounds(const nutrition_totals_t& before, const nutrition_totals_t& after,
+      const Profile& profile)
   {
-    return keepsLowerBound(
-      before.calories_, after.calories_,
-      profile.getDailyCaloriesGoal())
-      && keepsLowerBound(
-        before.protein_, after.protein_,
-        profile.getDailyProteinGoal())
-      && keepsLowerBound(
-        before.fat_, after.fat_,
-        profile.getDailyFatGoal())
-      && keepsLowerBound(
-        before.carbs_, after.carbs_,
-        profile.getDailyCarbsGoal());
+    return keepsLowerBound(before.calories_, after.calories_, profile.getDailyCaloriesGoal())
+        && keepsLowerBound(before.protein_, after.protein_, profile.getDailyProteinGoal())
+        && keepsLowerBound(before.fat_, after.fat_, profile.getDailyFatGoal())
+        && keepsLowerBound(before.carbs_, after.carbs_, profile.getDailyCarbsGoal());
   }
-  static bool improvePlan(
-    detail::Reductions& reductions,
-    nutrition_totals_t& totals,
-    const Profile& profile)
+  static bool improvePlan(detail::Reductions& reductions, nutrition_totals_t& totals,
+      const Profile& profile)
   {
     detail::Reductions::iterator best = reductions.end();
     nutrition_totals_t bestTotals = totals;
     double bestScore = getBalanceScore(totals, profile);
 
-    for (detail::Reductions::iterator current = reductions.begin();
-      current != reductions.end(); ++current)
+    for (detail::Reductions::iterator current = reductions.begin(); current != reductions.end();
+        ++current)
     {
       if (current->removedParts_ == detail::portionParts)
       {
         continue;
       }
 
-      const nutrition_totals_t candidate =
-        removeOnePart(totals, current->meal_);
+      const nutrition_totals_t candidate = removeOnePart(totals, current->meal_);
 
       if (!keepsLowerBounds(totals, candidate, profile))
       {
@@ -184,12 +160,11 @@ namespace nabieva
 
     return true;
   }
-  static void printIndicator(
-    const char* name, double value, double goal, std::ostream& output)
+  static void printIndicator(const char* name, double value, double goal, std::ostream& output)
   {
-    printText(output, name, 15);
-    output << std::right << std::setw(14) << value;
-    output << std::setw(14) << goal << "  ";
+    printText(output, name, detail::indicatorWidth);
+    output << std::right << std::setw(detail::numericWidth) << value;
+    output << std::setw(detail::numericWidth) << goal << "  ";
 
     if (getDeviation(value, goal) == 0.0)
     {
@@ -204,57 +179,44 @@ namespace nabieva
       output << "избыток\n";
     }
   }
-  static void printNutrition(
-    const nutrition_totals_t& totals,
-    const Profile& profile,
-    std::ostream& output)
+  static void printNutrition(const nutrition_totals_t& totals, const Profile& profile,
+      std::ostream& output)
   {
     const std::ios::fmtflags originalFlags = output.flags();
     const std::streamsize originalPrecision = output.precision();
 
     output << std::fixed << std::setprecision(0);
 
-    printText(output, "показатель", 15);
-    printText(output, "записано", 14, false);
-    printText(output, "цель", 14, false);
+    printText(output, "показатель", detail::indicatorWidth);
+    printText(output, "записано", detail::numericWidth, false);
+    printText(output, "цель", detail::numericWidth, false);
     output << "  статус\n";
 
-    printIndicator(
-      "калории, ккал", totals.calories_,
-      profile.getDailyCaloriesGoal(), output);
+    printIndicator("калории, ккал", totals.calories_, profile.getDailyCaloriesGoal(), output);
 
-    printIndicator(
-      "белки, г", totals.protein_,
-      profile.getDailyProteinGoal(), output);
+    printIndicator("белки, г", totals.protein_, profile.getDailyProteinGoal(), output);
 
-    printIndicator(
-      "жиры, г", totals.fat_,
-      profile.getDailyFatGoal(), output);
+    printIndicator("жиры, г", totals.fat_, profile.getDailyFatGoal(), output);
 
-    printIndicator(
-      "углеводы, г", totals.carbs_,
-      profile.getDailyCarbsGoal(), output);
+    printIndicator("углеводы, г", totals.carbs_, profile.getDailyCarbsGoal(), output);
 
     output.flags(originalFlags);
     output.precision(originalPrecision);
   }
-  static void printReductions(
-    const detail::Reductions& reductions,
-    std::ostream& output)
+  static void printReductions(const detail::Reductions& reductions, std::ostream& output)
   {
     const std::ios::fmtflags originalFlags = output.flags();
     const std::streamsize originalPrecision = output.precision();
 
-    output << std::defaultfloat << std::setprecision(6);
+    output << std::defaultfloat << std::setprecision(detail::defaultPrecision);
 
     for (detail::Reductions::const_iterator current = reductions.cbegin();
-      current != reductions.cend(); ++current)
+        current != reductions.cend(); ++current)
     {
       if (current->removedParts_ > 0)
       {
         const double fraction =
-          static_cast<double>(current->removedParts_)
-          / detail::portionParts;
+            static_cast< double >(current->removedParts_) / detail::portionParts;
 
         const double grams = current->meal_.getGrams() * fraction;
 
@@ -269,26 +231,35 @@ namespace nabieva
   }
 }
 
-void nabieva::analyzeDay(const Profile& profile, const FoodDiary& diary,
-  const std::string& line, std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::analyzeDay(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  const Date date = readOptionalDate(line, position);
+  const Profile& profile = context.profile_;
+  const FoodDiary& diary = context.diary_;
+  std::string dateText = "";
+  std::string extra = "";
+  const bool usesToday = !(input >> dateText);
+  const Date date = usesToday ? getCurrentDate() : parseDate(dateText);
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
 
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return;
+    return CommandResult::unchanged;
   }
 
-  const MealList* const meals = diary.find(date);
+  const FoodDiary::const_iterator day = diary.find(date);
 
-  if ((meals == nullptr) || meals->isEmpty())
+  if ((day == diary.end()) || day->second.isEmpty())
   {
     output << "нет записей о питании за " << date.getText() << ".\n";
-    return;
+    return CommandResult::unchanged;
   }
 
-  const nutrition_totals_t totals = calculateNutrition(*meals);
+  const nutrition_totals_t totals = calculateNutrition(day->second);
   const double originalScore = getBalanceScore(totals, profile);
 
   nutrition_totals_t planned = totals;
@@ -297,10 +268,9 @@ void nabieva::analyzeDay(const Profile& profile, const FoodDiary& diary,
 
   if (originalScore > 0.0)
   {
-    reductions = copyMeals(*meals);
+    reductions = copyMeals(day->second);
 
-    while ((getBalanceScore(planned, profile) > 0.0)
-      && improvePlan(reductions, planned, profile))
+    while ((getBalanceScore(planned, profile) > 0.0) && improvePlan(reductions, planned, profile))
     {
       changed = true;
     }
@@ -316,19 +286,19 @@ void nabieva::analyzeDay(const Profile& profile, const FoodDiary& diary,
   if (originalScore == 0.0)
   {
     output << "отлично! калории и все показатели бжу "
-      << "находятся в пределах ваших целей.\n";
-    return;
+           << "находятся в пределах ваших целей.\n";
+    return CommandResult::unchanged;
   }
 
   if (!changed)
   {
     output << "не найдено уменьшающих порции изменений, улучшающих баланс, "
-      << "при шаге 10% от исходной порции.\n";
+           << "при шаге 10% от исходной порции.\n";
 
     output << "возможно, нужно добавить или заменить блюда; "
-      << "проверьте статусы показателей выше.\n";
+           << "проверьте статусы показателей выше.\n";
 
-    return;
+    return CommandResult::unchanged;
   }
 
   output << "предлагаемые уменьшения (номера исходных записей):\n";
@@ -340,28 +310,27 @@ void nabieva::analyzeDay(const Profile& profile, const FoodDiary& diary,
   if (getBalanceScore(planned, profile) == 0.0)
   {
     output << "предложенные порции позволят достичь "
-      << "всех четырёх целевых диапазонов.\n";
+           << "всех четырёх целевых диапазонов.\n";
   }
   else
   {
     output << "баланс улучшился, но некоторые показатели "
-      << "остаются за пределами целевых диапазонов.\n";
+           << "остаются за пределами целевых диапазонов.\n";
 
     output << "дальнейших уменьшений, улучшающих баланс, не найдено "
-      << "при шаге 10% от исходной порции.\n";
+           << "при шаге 10% от исходной порции.\n";
   }
+  return CommandResult::unchanged;
 }
-void nabieva::recommendMeal(
-  const Profile& profile,
-  const FoodCatalog& catalog,
-  const FoodDiary& diary,
-  const std::string& line,
-  std::size_t position,
-  std::ostream& output)
+nabieva::CommandResult nabieva::recommendMeal(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  const Profile& profile = context.profile_;
+  const FoodCatalog& catalog = context.catalog_;
+  const FoodDiary& diary = context.diary_;
   std::string extra = "";
 
-  if (readToken(line, position, extra))
+  if ((input >> extra))
   {
     throw std::invalid_argument("указан лишний аргумент.");
   }
@@ -369,17 +338,17 @@ void nabieva::recommendMeal(
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   const Date date = getCurrentDate();
-  const MealList* const meals = diary.find(date);
+  const FoodDiary::const_iterator day = diary.find(date);
 
   nutrition_totals_t totals = {};
 
-  if (meals != nullptr)
+  if (day != diary.end())
   {
-    totals = calculateNutrition(*meals);
+    totals = calculateNutrition(day->second);
   }
 
   const double goal = profile.getDailyCaloriesGoal();
@@ -387,13 +356,13 @@ void nabieva::recommendMeal(
   if (totals.calories_ > goal)
   {
     output << "суточная цель по калориям уже превышена.\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   if (totals.calories_ == goal)
   {
     output << "суточная цель по калориям уже достигнута.\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   const double originalScore = getBalanceScore(totals, profile);
@@ -401,20 +370,25 @@ void nabieva::recommendMeal(
   if (originalScore == 0.0)
   {
     output << "калории и все показатели бжу "
-      << "уже находятся в пределах ваших целей.\n";
-    return;
+           << "уже находятся в пределах ваших целей.\n";
+    return CommandResult::unchanged;
   }
 
   if (catalog.isEmpty())
   {
     output << "каталог блюд пуст.\n";
-    return;
+    return CommandResult::unchanged;
   }
-  const Date minimumDate(1, 1, 1);
+  const Date minimumDate(detail::firstCalendarValue, detail::firstCalendarValue,
+      detail::firstCalendarValue);
   const MealList* yesterdayMeals = nullptr;
   if (date > minimumDate)
   {
-    yesterdayMeals = diary.find(date.getPreviousDay());
+    const FoodDiary::const_iterator yesterday = diary.find(date.getPreviousDay());
+    if (yesterday != diary.end())
+    {
+      yesterdayMeals = &yesterday->second;
+    }
   }
   const List< std::string > names = catalog.getKeys();
 
@@ -428,25 +402,19 @@ void nabieva::recommendMeal(
   const int maximumGrams = 300;
   const int portionStep = 25;
 
-  for (List< std::string >::const_iterator current = names.cbegin();
-    current != names.cend(); ++current)
+  for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+      ++current)
   {
-    const Food* const food = catalog.find(*current);
-    const bool repeated =
-      wasMainDishInMeals(*food, yesterdayMeals);
-    detail::recommendation_t foodChoice = { nullptr, 0, {}, originalScore, repeated };
-    for (int grams = minimumGrams;
-      grams <= maximumGrams;
-      grams += portionStep)
+    const Food* const food = &catalog.find(*current)->second;
+    const bool repeated = wasMainDishInMeals(*food, yesterdayMeals);
+    detail::recommendation_t foodChoice = {nullptr, 0, {}, originalScore, repeated};
+    for (int grams = minimumGrams; grams <= maximumGrams; grams += portionStep)
     {
-      const double factor = grams / 100.0;
+      const double factor = grams / detail::referenceGrams;
 
-      const nutrition_totals_t candidate = {
-        totals.calories_ + food->getCalories() * factor,
-        totals.protein_ + food->getProtein() * factor,
-        totals.fat_ + food->getFat() * factor,
-        totals.carbs_ + food->getCarbs() * factor
-      };
+      const nutrition_totals_t candidate = {totals.calories_ + food->getCalories() * factor,
+          totals.protein_ + food->getProtein() * factor, totals.fat_ + food->getFat() * factor,
+          totals.carbs_ + food->getCarbs() * factor};
 
       if (!canAddMeal(totals, candidate, profile))
       {
@@ -461,9 +429,9 @@ void nabieva::recommendMeal(
       }
 
       if ((foodChoice.food_ == nullptr) || (score < foodChoice.score_)
-        || ((score == foodChoice.score_) && (candidate.calories_ < foodChoice.totals_.calories_)))
+          || ((score == foodChoice.score_) && (candidate.calories_ < foodChoice.totals_.calories_)))
       {
-        foodChoice = { food, grams, candidate, score, repeated };
+        foodChoice = {food, grams, candidate, score, repeated};
       }
     }
     if (foodChoice.food_ == nullptr)
@@ -472,7 +440,7 @@ void nabieva::recommendMeal(
     }
     candidates.pushFront(foodChoice);
     if ((bestFood == nullptr) || (bestRepeated && !repeated)
-      || ((repeated == bestRepeated) && (foodChoice.score_ < bestScore)))
+        || ((repeated == bestRepeated) && (foodChoice.score_ < bestScore)))
     {
       bestFood = food;
       bestScore = foodChoice.score_;
@@ -482,8 +450,8 @@ void nabieva::recommendMeal(
   if (bestFood == nullptr)
   {
     output << "подходящее блюдо не найдено для порций "
-      << "от 50 до 300 г (шаг 25 г).\n";
-    return;
+           << "от 50 до 300 г (шаг 25 г).\n";
+    return CommandResult::unchanged;
   }
 
   const double relativeAllowance = 0.10;
@@ -492,7 +460,7 @@ void nabieva::recommendMeal(
   const double scoreLimit = bestScore + scoreAllowance;
   std::size_t suitableChoices = 0;
   for (List< detail::recommendation_t >::const_iterator current = candidates.cbegin();
-    current != candidates.cend(); ++current)
+      current != candidates.cend(); ++current)
   {
     if ((current->repeated_ != bestRepeated) || (current->score_ > scoreLimit))
     {
@@ -527,7 +495,7 @@ void nabieva::recommendMeal(
   if (bestRepeated)
   {
     output << "это блюдо было записано вчера. "
-      << "подходящей замены не найдено.\n";
+           << "подходящей замены не найдено.\n";
   }
   output << "расчётные итоги дня после этого блюда:\n";
   printNutrition(bestTotals, profile, output);
@@ -535,12 +503,12 @@ void nabieva::recommendMeal(
   if (bestScore == 0.0)
   {
     output << "эта порция приведёт все четыре показателя "
-      << "в целевые диапазоны.\n";
+           << "в целевые диапазоны.\n";
   }
   else
   {
     output << "эта порция улучшает баланс; "
-      << "некоторые показатели остаются за пределами целей.\n";
+           << "некоторые показатели остаются за пределами целей.\n";
   }
 
   output << "для записи: eat " << bestFood->getName();
@@ -548,4 +516,5 @@ void nabieva::recommendMeal(
 
   output.flags(originalFlags);
   output.precision(originalPrecision);
+  return CommandResult::unchanged;
 }

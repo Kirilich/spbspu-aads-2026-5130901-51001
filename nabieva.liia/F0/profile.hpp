@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <string>
+#include "nutrition_constants.hpp"
 
 namespace nabieva
 {
@@ -34,7 +35,6 @@ namespace nabieva
     void printProfile(std::ostream& output, double currentWeight) const;
 
     bool hasData() const;
-    bool hasMacroGoals() const;
 
     double getCurrentWeight() const;
     double getTargetWeight() const;
@@ -46,7 +46,7 @@ namespace nabieva
   private:
     profile_data_t data_;
     bool hasData_;
-    bool automaticGoals_[4];
+    bool automaticGoals_[detail::nutritionValueCount];
   };
 }
 

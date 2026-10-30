@@ -1,16 +1,25 @@
 #include "stats_commands.hpp"
-#include "console.hpp"
 #include <cmath>
 #include <iomanip>
+#include <istream>
 #include <ostream>
-#include "input.hpp"
-#include "nutrition.hpp"
 #include <stdexcept>
+#include "application_commands.hpp"
+#include "console.hpp"
+#include "nutrition.hpp"
 
-void nabieva::showDayStats(const Profile& profile, const WeightHistory& history,
-  const FoodDiary& diary, const std::string& line, std::size_t position, std::ostream& output)
+namespace nabieva
 {
-  const Date date = readOptionalDate(line, position);
+  namespace detail
+  {
+    constexpr int firstCalendarValue = 1;
+    constexpr int nextDayOffset = 1;
+  }
+}
+
+void nabieva::printDayStats(const Profile& profile, const WeightHistory& history,
+    const FoodDiary& diary, const Date& date, std::ostream& output)
+{
 
   if (!profile.hasData())
   {
@@ -18,12 +27,12 @@ void nabieva::showDayStats(const Profile& profile, const WeightHistory& history,
     return;
   }
 
-  nutrition_totals_t totals = { 0.0, 0.0, 0.0, 0.0};
-  const MealList* const meals = diary.find(date);
+  nutrition_totals_t totals = {0.0, 0.0, 0.0, 0.0};
+  const FoodDiary::const_iterator day = diary.find(date);
 
-  if (meals != nullptr)
+  if (day != diary.end())
   {
-    totals = calculateNutrition(*meals);
+    totals = calculateNutrition(day->second);
   }
 
   const double goal = profile.getDailyCaloriesGoal();
@@ -66,22 +75,33 @@ void nabieva::showDayStats(const Profile& profile, const WeightHistory& history,
   output.flags(originalFlags);
 }
 
-void nabieva::showWeekStats(const Profile& profile, const WeightHistory& history,
-  const FoodDiary& diary, const std::string& line, std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::showWeekStats(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  const Date endDate = readOptionalDate(line, position);
+  const Profile& profile = context.profile_;
+  const WeightHistory& history = context.history_;
+  const FoodDiary& diary = context.diary_;
+  std::string dateText = "";
+  std::string extra = "";
+  const bool usesToday = !(input >> dateText);
+  const Date endDate = usesToday ? getCurrentDate() : parseDate(dateText);
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
 
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   const int dayCount = 7;
-  const Date firstSupportedDate(1, 1, 1);
+  const Date firstSupportedDate(detail::firstCalendarValue, detail::firstCalendarValue,
+      detail::firstCalendarValue);
   Date firstDate = endDate;
 
-  for (int index = 1; index < dayCount; ++index)
+  for (int index = detail::nextDayOffset; index < dayCount; ++index)
   {
     if (firstDate == firstSupportedDate)
     {
@@ -97,16 +117,16 @@ void nabieva::showWeekStats(const Profile& profile, const WeightHistory& history
 
   for (int index = 0; index < dayCount; ++index)
   {
-    const MealList* const meals = diary.find(currentDate);
+    const FoodDiary::const_iterator day = diary.find(currentDate);
 
-    if (meals != nullptr)
+    if (day != diary.end())
     {
-      totals[index] = calculateNutrition(*meals);
+      totals[index] = calculateNutrition(day->second);
     }
 
     weights[index] = getWeightForDate(profile, history, currentDate);
 
-    if (index + 1 < dayCount)
+    if (index + detail::nextDayOffset < dayCount)
     {
       currentDate = currentDate.getNextDay();
     }
@@ -135,7 +155,7 @@ void nabieva::showWeekStats(const Profile& profile, const WeightHistory& history
     output << std::setw(numericWidth) << totals[index].carbs_;
     output << std::setw(numericWidth) << weights[index] << '\n';
 
-    if (index + 1 < dayCount)
+    if (index + detail::nextDayOffset < dayCount)
     {
       currentDate = currentDate.getNextDay();
     }
@@ -143,4 +163,20 @@ void nabieva::showWeekStats(const Profile& profile, const WeightHistory& history
 
   output.flags(originalFlags);
   output << "используется последний вес на дату; до первой записи берётся вес из профиля.\n";
+  return CommandResult::unchanged;
+}
+
+nabieva::CommandResult nabieva::showDayStats(std::istream& input, command_context_t& context,
+    std::ostream& output)
+{
+  std::string dateText = "";
+  std::string extra = "";
+  const bool usesToday = !(input >> dateText);
+  const Date date = usesToday ? getCurrentDate() : parseDate(dateText);
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
+  printDayStats(context.profile_, context.history_, context.diary_, date, output);
+  return CommandResult::unchanged;
 }

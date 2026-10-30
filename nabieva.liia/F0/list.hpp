@@ -7,27 +7,23 @@
 
 namespace nabieva
 {
-  template< class T >
-  class List;
-  template< class T >
-  class ListConstIterator;
+  template< class T > class List;
+  template< class T > class ListConstIterator;
   namespace detail
   {
-    template< class T >
-    struct ListNode
+    template< class T > struct ListNode
     {
       T value_;
       ListNode* next_;
 
-      ListNode(const T& value, ListNode* next) :
+      ListNode(const T& value, ListNode* next):
         value_(value),
         next_(next)
       {
       }
     };
   }
-  template< class T >
-  class ListIterator
+  template< class T > class ListIterator
   {
   public:
     using iterator_category = std::forward_iterator_tag;
@@ -36,7 +32,7 @@ namespace nabieva
     using pointer = T*;
     using reference = T&;
 
-    ListIterator() :
+    ListIterator():
       node_(nullptr)
     {
     }
@@ -60,7 +56,6 @@ namespace nabieva
     {
       return !(*this == other);
     }
-
 
     T& operator*() const
     {
@@ -102,14 +97,13 @@ namespace nabieva
 
     Node* node_;
 
-    explicit ListIterator(Node* node) :
+    explicit ListIterator(Node* node):
       node_(node)
     {
     }
   };
 
-  template< class T >
-  class ListConstIterator
+  template< class T > class ListConstIterator
   {
   public:
     using iterator_category = std::forward_iterator_tag;
@@ -118,12 +112,12 @@ namespace nabieva
     using pointer = const T*;
     using reference = const T&;
 
-    ListConstIterator() :
+    ListConstIterator():
       node_(nullptr)
     {
     }
 
-    ListConstIterator(const ListIterator< T >& other) :
+    ListConstIterator(const ListIterator< T >& other):
       node_(other.node_)
     {
     }
@@ -178,24 +172,23 @@ namespace nabieva
 
     const Node* node_;
 
-    explicit ListConstIterator(const Node* node) :
+    explicit ListConstIterator(const Node* node):
       node_(node)
     {
     }
   };
 
-  template< class T >
-  class List
+  template< class T > class List
   {
   public:
     using iterator = ListIterator< T >;
     using const_iterator = ListConstIterator< T >;
-    List() :
+    List():
       head_(nullptr)
     {
     }
 
-    List(const List& other) :
+    List(const List& other):
       head_(nullptr)
     {
       const Node* current = other.head_;
@@ -227,7 +220,7 @@ namespace nabieva
       }
     }
 
-    List(List&& other) noexcept :
+    List(List&& other) noexcept:
       head_(other.head_)
     {
       other.head_ = nullptr;
@@ -243,9 +236,7 @@ namespace nabieva
       if (this != &other)
       {
         List copy(other);
-        clear();
-        head_ = copy.head_;
-        copy.head_ = nullptr;
+        swap(copy);
       }
 
       return *this;
@@ -261,6 +252,13 @@ namespace nabieva
       }
 
       return *this;
+    }
+
+    void swap(List& other) noexcept
+    {
+      Node* const temporary = head_;
+      head_ = other.head_;
+      other.head_ = temporary;
     }
 
     bool isEmpty() const

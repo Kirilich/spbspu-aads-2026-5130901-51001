@@ -2,11 +2,14 @@
 #define HELP_COMMANDS_HPP
 
 #include <iosfwd>
-#include <string>
 
 namespace nabieva
 {
-  void printHelp(std::ostream& output, const std::string& dataFile);
+  enum class CommandResult;
+  struct command_context_t;
+
+  CommandResult printHelp(std::istream& input, command_context_t& context, std::ostream& output);
+  CommandResult exitProgram(std::istream& input, command_context_t& context, std::ostream& output);
 }
 
 #endif

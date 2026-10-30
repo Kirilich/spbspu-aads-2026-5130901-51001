@@ -1,14 +1,16 @@
 #ifndef PROFILE_COMMANDS_HPP
 #define PROFILE_COMMANDS_HPP
 
-#include <cstddef>
-#include <string>
+#include <iosfwd>
 
 namespace nabieva
 {
-  class Profile;
+  enum class CommandResult;
+  struct command_context_t;
 
-  void setProfileFromCommand(Profile& profile, const std::string& line, std::size_t position);
+  CommandResult setProfileFromCommand(std::istream& input, command_context_t& context,
+      std::ostream& output);
+  CommandResult showProfile(std::istream& input, command_context_t& context, std::ostream& output);
 }
 
 #endif

@@ -1,140 +1,157 @@
 #include "meal_commands.hpp"
-#include "console.hpp"
-#include "nutrition.hpp"
+#include <cctype>
 #include <cmath>
 #include <iomanip>
+#include <istream>
 #include <ostream>
 #include <stdexcept>
-#include "input.hpp"
+#include "application_commands.hpp"
+#include "console.hpp"
+#include "nutrition.hpp"
 
-bool nabieva::recordMeal(const FoodCatalog& catalog, FoodDiary& diary,
-  const std::string& line, std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::recordMeal(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  const FoodCatalog& catalog = context.catalog_;
+  FoodDiary& diary = context.diary_;
   std::string name = "";
-  std::string gramsText = "";
   double grams = 0.0;
 
-  if (!readToken(line, position, name) || !readToken(line, position, gramsText)
-    || !readNumber(gramsText, grams) || (grams <= 0.0))
+  if (!(input >> name >> grams) || !std::isfinite(grams) || (grams <= 0.0)
+      || (!input.eof() && !std::isspace(input.peek())))
   {
     throw std::invalid_argument("неверные параметры приёма пищи.");
   }
 
-  const Date date = readOptionalDate(line, position);
-  const Food* const food = catalog.find(name);
+  std::string dateText = "";
+  std::string extra = "";
+  const bool usesToday = !(input >> dateText);
+  const Date date = usesToday ? getCurrentDate() : parseDate(dateText);
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
+  const FoodCatalog::const_iterator food = catalog.find(name);
 
-  if (food == nullptr)
+  if (food == catalog.end())
   {
     output << "блюдо не найдено.\n";
-    return false;
+    return CommandResult::unchanged;
   }
 
-  const Meal meal(*food, grams);
-  MealList* const meals = diary.find(date);
+  const Meal meal(food->second, grams);
+  const FoodDiary::iterator day = diary.find(date);
   nutrition_totals_t totals = {};
-  if (meals != nullptr)
+  if (day != diary.end())
   {
-    totals = calculateNutrition(*meals);
+    totals = calculateNutrition(day->second);
   }
   if (!std::isfinite(totals.calories_ + meal.getCalories())
-    || !std::isfinite(totals.protein_ + meal.getProtein())
-    || !std::isfinite(totals.fat_ + meal.getFat())
-    || !std::isfinite(totals.carbs_ + meal.getCarbs()))
+      || !std::isfinite(totals.protein_ + meal.getProtein())
+      || !std::isfinite(totals.fat_ + meal.getFat())
+      || !std::isfinite(totals.carbs_ + meal.getCarbs()))
   {
     throw std::invalid_argument("суммарные кбжу за день получились бы слишком большими.");
   }
 
-  if (meals == nullptr)
+  if (day == diary.end())
   {
     MealList newMeals;
     newMeals.pushFront(meal);
     diary.add(date, newMeals);
   }
-  else if (meals->isEmpty())
+  else if (day->second.isEmpty())
   {
-    meals->pushFront(meal);
+    day->second.pushFront(meal);
   }
   else
   {
-    MealList::iterator last = meals->begin();
+    MealList::iterator last = day->second.begin();
     MealList::iterator next = last;
     ++next;
 
-    while (next != meals->end())
+    while (next != day->second.end())
     {
       last = next;
       ++next;
     }
 
-    meals->insertAfter(last, meal);
+    day->second.insertAfter(last, meal);
   }
 
   output << "приём пищи записан.\n";
-  return true;
+  return CommandResult::changed;
 }
-bool nabieva::removeMeal(FoodDiary& diary, const std::string& line,
-  std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::removeMeal(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  std::string text = "";
+  FoodDiary& diary = context.diary_;
   std::size_t number = 0;
 
-  if (!readToken(line, position, text) || !readPositiveInteger(text, number))
+  input >> std::ws;
+  if (!std::isdigit(input.peek()) || !(input >> number) || (number == 0)
+      || (!input.eof() && !std::isspace(input.peek())))
   {
     throw std::invalid_argument("неверный номер записи о питании.");
   }
 
-  const Date date = readOptionalDate(line, position);
-  MealList* const meals = diary.find(date);
+  std::string dateText = "";
+  std::string extra = "";
+  const bool usesToday = !(input >> dateText);
+  const Date date = usesToday ? getCurrentDate() : parseDate(dateText);
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
+  const FoodDiary::iterator day = diary.find(date);
 
-  if ((meals == nullptr) || meals->isEmpty())
+  if ((day == diary.end()) || day->second.isEmpty())
   {
     output << "запись о приёме пищи не найдена.\n";
-    return false;
+    return CommandResult::unchanged;
   }
 
   const std::size_t firstNumber = 1;
   std::size_t currentNumber = firstNumber;
-  MealList::iterator current = meals->begin();
+  MealList::iterator current = day->second.begin();
   MealList::iterator previous = current;
 
-  while ((current != meals->end()) && (currentNumber < number))
+  while ((current != day->second.end()) && (currentNumber < number))
   {
     previous = current;
     ++current;
     ++currentNumber;
   }
 
-  if (current == meals->end())
+  if (current == day->second.end())
   {
     output << "запись о приёме пищи не найдена.\n";
-    return false;
+    return CommandResult::unchanged;
   }
 
   if (number == firstNumber)
   {
-    meals->popFront();
+    day->second.popFront();
   }
   else
   {
-    meals->eraseAfter(previous);
+    day->second.eraseAfter(previous);
   }
 
-  if (meals->isEmpty())
+  if (day->second.isEmpty())
   {
     diary.remove(date);
   }
 
   output << "запись о приёме пищи удалена.\n";
-  return true;
+  return CommandResult::changed;
 }
 
-void nabieva::listMeals(const FoodDiary& diary, const std::string& line,
-  std::size_t position, std::ostream& output)
+void nabieva::printMeals(const FoodDiary& diary, const Date& date, std::ostream& output)
 {
-  const Date date = readOptionalDate(line, position);
-  const MealList* const meals = diary.find(date);
+  const FoodDiary::const_iterator day = diary.find(date);
 
-  if ((meals == nullptr) || meals->isEmpty())
+  if ((day == diary.end()) || day->second.isEmpty())
   {
     output << "нет записей о питании за " << date.getText() << ".\n";
     return;
@@ -143,9 +160,10 @@ void nabieva::listMeals(const FoodDiary& diary, const std::string& line,
   const std::size_t minimumNameWidth = getTextWidth("блюдо");
   const std::size_t columnGap = 2;
   std::size_t nameWidth = minimumNameWidth;
-  const nutrition_totals_t totals = calculateNutrition(*meals);
+  const nutrition_totals_t totals = calculateNutrition(day->second);
 
-  for (MealList::const_iterator current = meals->cbegin(); current != meals->cend(); ++current)
+  for (MealList::const_iterator current = day->second.cbegin(); current != day->second.cend();
+      ++current)
   {
     const std::size_t length = getTextWidth(current->getFood().getName());
 
@@ -171,7 +189,8 @@ void nabieva::listMeals(const FoodDiary& diary, const std::string& line,
   output << '\n';
 
   std::size_t number = 0;
-  for (MealList::const_iterator current = meals->cbegin(); current != meals->cend(); ++current)
+  for (MealList::const_iterator current = day->second.cbegin(); current != day->second.cend();
+      ++current)
   {
     ++number;
 
@@ -191,4 +210,19 @@ void nabieva::listMeals(const FoodDiary& diary, const std::string& line,
   output << "итого: " << totals.calories_ << " ккал\n";
 
   output << "б:" << totals.protein_ << "г ж:" << totals.fat_ << "г у:" << totals.carbs_ << "г\n";
+}
+
+nabieva::CommandResult nabieva::listMeals(std::istream& input, command_context_t& context,
+    std::ostream& output)
+{
+  std::string dateText = "";
+  std::string extra = "";
+  const bool usesToday = !(input >> dateText);
+  const Date date = usesToday ? getCurrentDate() : parseDate(dateText);
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
+  printMeals(context.diary_, date, output);
+  return CommandResult::unchanged;
 }

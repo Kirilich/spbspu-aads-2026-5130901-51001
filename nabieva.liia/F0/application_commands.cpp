@@ -4,122 +4,44 @@
 #include "export_commands.hpp"
 #include "food_commands.hpp"
 #include "help_commands.hpp"
-#include "input.hpp"
 #include "plan_commands.hpp"
 #include "profile_commands.hpp"
 #include "stats_commands.hpp"
 
-namespace nabieva
+void nabieva::registerCommands(CommandTree& commands)
 {
-  static CommandResult getChangeResult(bool changed)
-  {
-    return changed ? CommandResult::changed : CommandResult::unchanged;
-  }
+  commands.add("profile", setProfileFromCommand);
+  commands.add("show-profile", showProfile);
+  commands.add("food-add", addFood);
+  commands.add("food-remove", removeFood);
+  commands.add("food-load", loadFood);
+  commands.add("food-save", saveFood);
+  commands.add("food-list", listFood);
+  commands.add("weight-log", logWeight);
+  commands.add("weight-remove", removeWeight);
+  commands.add("weight-list", listWeights);
+  commands.add("weight-graph", drawWeightGraph);
+  commands.add("eat", recordMeal);
+  commands.add("eat-remove", removeMeal);
+  commands.add("eat-list", listMeals);
+  commands.add("day-stats", showDayStats);
+  commands.add("week-stats", showWeekStats);
+  commands.add("export", exportReport);
+  commands.add("generate-plan", generatePlan);
+  commands.add("recommend-meal", recommendMeal);
+  commands.add("analyze-day", analyzeDay);
+  commands.add("help", printHelp);
+  commands.add("exit", exitProgram);
 }
 
-nabieva::CommandResult nabieva::executeCommand(const std::string& command,
-  const std::string& line, std::size_t position, command_context_t& context, std::ostream& output)
+nabieva::CommandResult nabieva::executeCommand(const CommandTree& commands,
+    const std::string& command, std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  if (command == "profile")
+  const CommandTree::const_iterator found = commands.find(command);
+  if (found == commands.end())
   {
-    setProfileFromCommand(context.profile_, line, position);
-    return CommandResult::profileChanged;
+    throw std::invalid_argument("неизвестная команда.");
   }
-  if (command == "food-add")
-  {
-    return getChangeResult(addFood(context.catalog_, line, position, output));
-  }
-  if (command == "food-remove")
-  {
-    return getChangeResult(removeFood(context.catalog_, line, position, output));
-  }
-  if (command == "food-load")
-  {
-    return getChangeResult(loadFood(context.catalog_, line, position, output));
-  }
-  if (command == "weight-log")
-  {
-    return getChangeResult(logWeight(context.profile_, context.history_, line, position, output));
-  }
-  if (command == "weight-remove")
-  {
-    return getChangeResult(removeWeight(context.history_, line, position, output));
-  }
-  if (command == "eat")
-  {
-    return getChangeResult(recordMeal(context.catalog_, context.diary_, line, position, output));
-  }
-  if (command == "eat-remove")
-  {
-    return getChangeResult(removeMeal(context.diary_, line, position, output));
-  }
-  if (command == "food-save")
-  {
-    saveFood(context.catalog_, line, position, output);
-  }
-  else if (command == "eat-list")
-  {
-    listMeals(context.diary_, line, position, output);
-  }
-  else if (command == "day-stats")
-  {
-    showDayStats(context.profile_, context.history_, context.diary_, line, position, output);
-  }
-  else if (command == "week-stats")
-  {
-    showWeekStats(context.profile_, context.history_, context.diary_, line, position, output);
-  }
-  else if (command == "export")
-  {
-    exportReport(context.profile_, context.history_, context.diary_, line, position, output);
-  }
-  else if (command == "generate-plan")
-  {
-    generatePlan(context.profile_, context.catalog_, context.diary_, line, position, output);
-  }
-  else if (command == "recommend-meal")
-  {
-    recommendMeal(context.profile_, context.catalog_, context.diary_, line, position, output);
-  }
-  else if (command == "analyze-day")
-  {
-    analyzeDay(context.profile_, context.diary_, line, position, output);
-  }
-  else
-  {
-    std::string extra = "";
-    if (readToken(line, position, extra))
-    {
-      throw std::invalid_argument("лишние параметры команды.");
-    }
-    if (command == "help")
-    {
-      printHelp(output, context.dataFile_);
-    }
-    else if (command == "show-profile")
-    {
-      context.profile_.printProfile(output, getCurrentWeight(context.profile_, context.history_));
-    }
-    else if (command == "food-list")
-    {
-      listFood(context.catalog_, output);
-    }
-    else if (command == "weight-list")
-    {
-      listWeights(context.history_, output);
-    }
-    else if (command == "weight-graph")
-    {
-      drawWeightGraph(context.profile_, context.history_, output);
-    }
-    else if (command == "exit")
-    {
-      return CommandResult::exit;
-    }
-    else
-    {
-      throw std::invalid_argument("неизвестная команда.");
-    }
-  }
-  return CommandResult::unchanged;
+  return found->second(input, context, output);
 }

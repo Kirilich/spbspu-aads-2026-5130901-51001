@@ -8,8 +8,8 @@ namespace nabieva
   class Food
   {
   public:
-    Food(const std::string& name, double calories, double protein,
-      double fat, double carbs, const std::string& category);
+    Food(const std::string& name, double calories, double protein, double fat, double carbs,
+        const std::string& category);
 
     const std::string& getName() const;
     const std::string& getCategory() const;

@@ -1,9 +1,11 @@
 #include "weight_commands.hpp"
+#include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <istream>
 #include <ostream>
 #include <stdexcept>
-#include <iomanip>
-#include "input.hpp"
+#include "application_commands.hpp"
 
 namespace nabieva
 {
@@ -15,7 +17,7 @@ namespace nabieva
     }
 
     const double position = (maximum - weight) / range;
-    return static_cast<int>(std::round(position * intervals));
+    return static_cast< int >(std::round(position * intervals));
   }
 }
 
@@ -23,12 +25,13 @@ double nabieva::getCurrentWeight(const Profile& profile, const WeightHistory& hi
 {
   return getWeightForDate(profile, history, getCurrentDate());
 }
-double nabieva::getWeightForDate(const Profile& profile, const WeightHistory& history, const Date& date)
+double nabieva::getWeightForDate(const Profile& profile, const WeightHistory& history,
+    const Date& date)
 {
   double weight = profile.getCurrentWeight();
 
-  for (WeightHistory::const_iterator position = history.begin();
-    position != history.end(); ++position)
+  for (WeightHistory::const_iterator position = history.begin(); position != history.end();
+      ++position)
   {
     if (date < position->first)
     {
@@ -40,25 +43,33 @@ double nabieva::getWeightForDate(const Profile& profile, const WeightHistory& hi
 
   return weight;
 }
-bool nabieva::logWeight(const Profile& profile, WeightHistory& history,
-  const std::string& line, std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::logWeight(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  std::string text = "";
+  const Profile& profile = context.profile_;
+  WeightHistory& history = context.history_;
+  std::string dateText = "";
+  std::string extra = "";
   double weight = 0.0;
 
-  if (!readToken(line, position, text) || !readNumber(text, weight) || (weight <= 0.0))
+  if (!(input >> weight) || !std::isfinite(weight) || (weight <= 0.0)
+      || (!input.eof() && !std::isspace(input.peek())))
   {
     throw std::invalid_argument("вес должен быть положительным конечным числом.");
   }
 
-  const std::string separators = " \t\r\n";
-  const bool usesToday = line.find_first_not_of(separators, position) == std::string::npos;
-  const Date date = readOptionalDate(line, position);
+  const bool usesToday = !(input >> dateText);
+  const Date date = usesToday ? getCurrentDate() : parseDate(dateText);
+
+  if (input >> extra)
+  {
+    throw std::invalid_argument("после даты указаны лишние аргументы.");
+  }
 
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return false;
+    return CommandResult::unchanged;
   }
 
   const double previousWeight = getCurrentWeight(profile, history);
@@ -74,7 +85,7 @@ bool nabieva::logWeight(const Profile& profile, WeightHistory& history,
       output << "запись веса уже существует за " << date.getText() << ".\n";
     }
 
-    return false;
+    return CommandResult::unchanged;
   }
 
   const double currentWeight = getCurrentWeight(profile, history);
@@ -89,15 +100,16 @@ bool nabieva::logWeight(const Profile& profile, WeightHistory& history,
   {
     output << "вес записан.\n";
   }
-  return true;
+  return CommandResult::changed;
 }
-bool nabieva::removeWeight(WeightHistory& history, const std::string& line,
-  std::size_t position, std::ostream& output)
+nabieva::CommandResult nabieva::removeWeight(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  WeightHistory& history = context.history_;
   std::string text = "";
   std::string extra = "";
 
-  if (!readToken(line, position, text) || readToken(line, position, extra))
+  if (!(input >> text) || (input >> extra))
   {
     throw std::invalid_argument("неверные параметры удаления записи веса.");
   }
@@ -107,52 +119,69 @@ bool nabieva::removeWeight(WeightHistory& history, const std::string& line,
   if (history.remove(date))
   {
     output << "запись веса удалена.\n";
-    return true;
+    return CommandResult::changed;
   }
   else
   {
     output << "нет записи веса за " << date.getText() << '\n';
-    return false;
+    return CommandResult::unchanged;
   }
 }
-void nabieva::listWeights(const WeightHistory& history, std::ostream& output)
+nabieva::CommandResult nabieva::listWeights(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  WeightHistory& history = context.history_;
+  std::string extra = "";
+  if (input >> extra)
+  {
+    throw std::invalid_argument("лишние параметры команды.");
+  }
+
   if (history.isEmpty())
   {
     output << "история веса пуста.\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   output << "история веса:\n";
 
-  for (WeightHistory::const_iterator position = history.begin();
-    position != history.end(); ++position)
+  for (WeightHistory::const_iterator position = history.begin(); position != history.end();
+      ++position)
   {
     output << position->first.getText() << " | " << position->second << " кг\n";
   }
+  return CommandResult::unchanged;
 }
 
-void nabieva::drawWeightGraph(const Profile& profile, const WeightHistory& history,
-  std::ostream& output)
+nabieva::CommandResult nabieva::drawWeightGraph(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  const Profile& profile = context.profile_;
+  WeightHistory& history = context.history_;
+  std::string extra = "";
+  if (input >> extra)
+  {
+    throw std::invalid_argument("лишние параметры команды.");
+  }
+
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   if (history.isEmpty())
   {
     output << "история веса пуста.\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   const double target = profile.getTargetWeight();
   double minimum = target;
   double maximum = target;
 
-  for (WeightHistory::const_iterator position = history.begin();
-    position != history.end(); ++position)
+  for (WeightHistory::const_iterator position = history.begin(); position != history.end();
+      ++position)
   {
     if (position->second < minimum)
     {
@@ -205,13 +234,12 @@ void nabieva::drawWeightGraph(const Profile& profile, const WeightHistory& histo
 
       if (range != 0.0)
       {
-        level = maximum - range * (static_cast<double>(row) / intervals);
+        level = maximum - range * (static_cast< double >(row) / intervals);
       }
 
       output << std::right << std::setw(labelWidth) << level << " |";
 
-      for (WeightHistory::const_iterator position = pageBegin;
-        position != pageEnd; ++position)
+      for (WeightHistory::const_iterator position = pageBegin; position != pageEnd; ++position)
       {
         char background = ' ';
 
@@ -225,7 +253,8 @@ void nabieva::drawWeightGraph(const Profile& profile, const WeightHistory& histo
 
         if (row == weightRow)
         {
-          cell[columnWidth / 2] = '*';
+          const std::size_t halves = 2;
+          cell[columnWidth / halves] = '*';
         }
 
         output << cell;
@@ -241,10 +270,10 @@ void nabieva::drawWeightGraph(const Profile& profile, const WeightHistory& histo
 
     output << std::setw(labelWidth) << "" << "  ";
 
-    for (WeightHistory::const_iterator position = pageBegin;
-      position != pageEnd; ++position)
+    for (WeightHistory::const_iterator position = pageBegin; position != pageEnd; ++position)
     {
-      output << ' ' << std::left << std::setw(static_cast<int>(columnWidth - 1));
+      const std::size_t separatorWidth = 1;
+      output << ' ' << std::left << std::setw(static_cast< int >(columnWidth - separatorWidth));
       output << position->first.getText();
     }
 
@@ -256,4 +285,5 @@ void nabieva::drawWeightGraph(const Profile& profile, const WeightHistory& histo
 
   output << "текущий вес: " << getCurrentWeight(profile, history) << " кг\n";
   output << "желаемый вес: " << target << " кг\n";
+  return CommandResult::unchanged;
 }

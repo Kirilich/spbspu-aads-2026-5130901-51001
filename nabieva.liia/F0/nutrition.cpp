@@ -1,10 +1,11 @@
 #include "nutrition.hpp"
 #include <cmath>
 #include <stdexcept>
+#include "profile.hpp"
 
 nabieva::nutrition_totals_t nabieva::calculateNutrition(const List< Meal >& meals)
 {
-  nutrition_totals_t totals = { 0.0, 0.0, 0.0, 0.0 };
+  nutrition_totals_t totals = {0.0, 0.0, 0.0, 0.0};
 
   for (List< Meal >::const_iterator current = meals.cbegin(); current != meals.cend(); ++current)
   {
@@ -19,8 +20,8 @@ nabieva::nutrition_totals_t nabieva::calculateNutrition(const List< Meal >& meal
     throw std::overflow_error("сумма калорий за день слишком велика.");
   }
 
-  if (!std::isfinite(totals.protein_)
-    || !std::isfinite(totals.fat_) || !std::isfinite(totals.carbs_))
+  if (!std::isfinite(totals.protein_) || !std::isfinite(totals.fat_)
+      || !std::isfinite(totals.carbs_))
   {
     throw std::overflow_error("суммарные бжу за день слишком велики.");
   }
@@ -30,8 +31,7 @@ nabieva::nutrition_totals_t nabieva::calculateNutrition(const List< Meal >& meal
 
 double nabieva::getDeviation(double value, double goal)
 {
-  if (!std::isfinite(value) || !std::isfinite(goal)
-    || (value < 0.0) || (goal <= 0.0))
+  if (!std::isfinite(value) || !std::isfinite(goal) || (value < 0.0) || (goal <= 0.0))
   {
     throw std::invalid_argument("неверное значение кбжу или цели.");
   }
@@ -55,26 +55,17 @@ double nabieva::getDeviation(double value, double goal)
   return distance - tolerance;
 }
 
-double nabieva::getBalanceScore(
-  const nutrition_totals_t& totals,
-  const nutrition_totals_t& goals)
+double nabieva::getBalanceScore(const nutrition_totals_t& totals, const nutrition_totals_t& goals)
 {
-  const double calories = getDeviation(
-    totals.calories_, goals.calories_);
+  const double calories = getDeviation(totals.calories_, goals.calories_);
 
-  const double protein = getDeviation(
-    totals.protein_, goals.protein_);
+  const double protein = getDeviation(totals.protein_, goals.protein_);
 
-  const double fat = getDeviation(
-    totals.fat_, goals.fat_);
+  const double fat = getDeviation(totals.fat_, goals.fat_);
 
-  const double carbs = getDeviation(
-    totals.carbs_, goals.carbs_);
+  const double carbs = getDeviation(totals.carbs_, goals.carbs_);
 
-  const double score = calories * calories
-    + protein * protein
-    + fat * fat
-    + carbs * carbs;
+  const double score = calories * calories + protein * protein + fat * fat + carbs * carbs;
 
   if (!std::isfinite(score))
   {
@@ -83,16 +74,10 @@ double nabieva::getBalanceScore(
 
   return score;
 }
-double nabieva::getBalanceScore(
-  const nutrition_totals_t& totals,
-  const Profile& profile)
+double nabieva::getBalanceScore(const nutrition_totals_t& totals, const Profile& profile)
 {
-  const nutrition_totals_t goals = {
-    profile.getDailyCaloriesGoal(),
-    profile.getDailyProteinGoal(),
-    profile.getDailyFatGoal(),
-    profile.getDailyCarbsGoal()
-  };
+  const nutrition_totals_t goals = {profile.getDailyCaloriesGoal(), profile.getDailyProteinGoal(),
+      profile.getDailyFatGoal(), profile.getDailyCarbsGoal()};
 
   return getBalanceScore(totals, goals);
 }

@@ -8,7 +8,7 @@ std::size_t nabieva::getTextWidth(const std::string& text)
   const unsigned char continuationPrefix = 0x80;
   for (std::size_t index = 0; index < text.size(); ++index)
   {
-    const unsigned char symbol = static_cast<unsigned char>(text[index]);
+    const unsigned char symbol = static_cast< unsigned char >(text[index]);
     if ((symbol & continuationMask) != continuationPrefix)
     {
       ++width;
@@ -17,8 +17,8 @@ std::size_t nabieva::getTextWidth(const std::string& text)
   return width;
 }
 
-void nabieva::printText(std::ostream& output, const std::string& text,
-  std::size_t width, bool leftAligned)
+void nabieva::printText(std::ostream& output, const std::string& text, std::size_t width,
+    bool leftAligned)
 {
   const std::size_t length = getTextWidth(text);
   const std::size_t padding = (width > length) ? width - length : 0;

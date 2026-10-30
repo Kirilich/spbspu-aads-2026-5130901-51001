@@ -1,15 +1,15 @@
+#include <exception>
 #include <iostream>
-#include <stdexcept>
+#include <sstream>
 #include <string>
 #include "application_commands.hpp"
 #include "data_storage.hpp"
-#include "input.hpp"
 
 namespace nabieva
 {
   static bool saveApplicationData(const std::string& filePath, const Profile& profile,
-    const FoodCatalog& catalog, const WeightHistory& history, const FoodDiary& diary,
-    bool savingEnabled)
+      const FoodCatalog& catalog, const WeightHistory& history, const FoodDiary& diary,
+      bool savingEnabled)
   {
     if (!savingEnabled)
     {
@@ -32,21 +32,28 @@ namespace nabieva
 
 int main(int argc, char* argv[])
 {
+  const int defaultArgumentCount = 1;
+  const int customPathArgumentCount = 3;
+  const int optionIndex = 1;
+  const int pathIndex = 2;
+  const int inputErrorCode = 1;
+  const int storageErrorCode = 2;
+
   nabieva::Profile profile;
   nabieva::WeightHistory weightHistory;
   nabieva::FoodDiary diary;
   const std::size_t bucketCount = 16;
   nabieva::FoodCatalog catalog(bucketCount);
   std::string dataFile = nabieva::getDataFilePath((argc > 0) ? argv[0] : "");
-  if ((argc == 3) && (std::string(argv[1]) == "--data-dir")
-    && !std::string(argv[2]).empty())
+  if ((argc == customPathArgumentCount) && (std::string(argv[optionIndex]) == "--data-dir")
+      && !std::string(argv[pathIndex]).empty())
   {
-    dataFile = std::string(argv[2]) + "/tracker.txt";
+    dataFile = std::string(argv[pathIndex]) + "/tracker.txt";
   }
-  else if (argc != 1)
+  else if (argc != defaultArgumentCount)
   {
     std::cerr << "запуск: fitness [--data-dir <существующая_папка>]\n";
-    return 1;
+    return inputErrorCode;
   }
 
   bool savingEnabled = true;
@@ -64,21 +71,20 @@ int main(int argc, char* argv[])
     savingEnabled = false;
   }
 
-  nabieva::command_context_t context = { profile, catalog, weightHistory, diary, dataFile };
+  nabieva::command_context_t context = {profile, catalog, weightHistory, diary, dataFile};
+
+  nabieva::CommandTree commands;
+  nabieva::registerCommands(commands);
 
   std::string line = "";
   bool firstCommand = true;
 
   while (std::getline(std::cin, line))
   {
-    std::size_t position = 0;
+    std::istringstream input(line);
     std::string command = "";
 
-    if (!nabieva::readToken(line, position, command))
-    {
-      continue;
-    }
-    if (command.empty())
+    if (!(input >> command))
     {
       continue;
     }
@@ -90,21 +96,21 @@ int main(int argc, char* argv[])
 
     try
     {
-      const nabieva::CommandResult result = nabieva::executeCommand(
-        command, line, position, context, std::cout);
+      const nabieva::CommandResult result =
+          nabieva::executeCommand(commands, command, input, context, std::cout);
       if (result == nabieva::CommandResult::exit)
       {
         break;
       }
       if ((result == nabieva::CommandResult::changed)
-        || (result == nabieva::CommandResult::profileChanged))
+          || (result == nabieva::CommandResult::profileChanged))
       {
-        const bool saved = nabieva::saveApplicationData(
-          dataFile, profile, catalog, weightHistory, diary, savingEnabled);
+        const bool saved = nabieva::saveApplicationData(dataFile, profile, catalog, weightHistory,
+            diary, savingEnabled);
         if (result == nabieva::CommandResult::profileChanged)
         {
           std::cout << (saved ? "профиль сохранён.\n"
-            : "профиль изменён только в памяти; в файл данные не сохранены.\n");
+                              : "профиль изменён только в памяти; в файл данные не сохранены.\n");
         }
       }
     }
@@ -116,15 +122,14 @@ int main(int argc, char* argv[])
 
   if (std::cin.bad())
   {
-    const int inputErrorCode = 1;
     std::cerr << "ошибка чтения ввода.\n";
     return inputErrorCode;
   }
 
-  if (!nabieva::saveApplicationData(
-    dataFile, profile, catalog, weightHistory, diary, savingEnabled))
+  if (!nabieva::saveApplicationData(dataFile, profile, catalog, weightHistory, diary,
+          savingEnabled))
   {
-    return 2;
+    return storageErrorCode;
   }
 
   return 0;

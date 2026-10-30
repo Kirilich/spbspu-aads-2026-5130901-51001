@@ -1,102 +1,102 @@
 #include "food_commands.hpp"
-#include "console.hpp"
-#include <iomanip>
-#include <ostream>
-#include <stdexcept>
-#include "input.hpp"
+#include <cctype>
 #include <fstream>
+#include <iomanip>
+#include <istream>
 #include <limits>
 #include <locale>
+#include <ostream>
+#include <stdexcept>
+#include "application_commands.hpp"
+#include "console.hpp"
+#include "nutrition_constants.hpp"
 
-bool nabieva::addFood(
-  FoodCatalog& catalog,
-  const std::string& line,
-  std::size_t position,
-  std::ostream& output)
+nabieva::CommandResult nabieva::addFood(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  const std::size_t argumentCount = 6;
-  std::string arguments[argumentCount] = {};
+  FoodCatalog& catalog = context.catalog_;
+  std::string name = "";
+  std::string category = "";
+  std::string extra = "";
+  double values[detail::nutritionValueCount] = {};
 
-  for (std::size_t index = 0; index < argumentCount; ++index)
+  if (!(input >> name))
   {
-    if (!readToken(line, position, arguments[index]))
+    throw std::invalid_argument("не указано название блюда.");
+  }
+
+  for (std::size_t index = 0; index < detail::nutritionValueCount; ++index)
+  {
+    if (!(input >> values[index]))
     {
-      throw std::invalid_argument("не хватает параметров блюда.");
+      throw std::invalid_argument("неверное значение кбжу.");
+    }
+
+    if (!std::isspace(input.peek()))
+    {
+      throw std::invalid_argument("после числа нужен пробел.");
     }
   }
 
-  std::string extra = "";
-
-  if (readToken(line, position, extra))
+  if (!(input >> category) || (input >> extra))
   {
     throw std::invalid_argument("неверные параметры блюда.");
   }
 
-  const std::size_t valueCount = 4;
-  double values[valueCount] = {};
-
-  for (std::size_t index = 0; index < valueCount; ++index)
-  {
-    if (!readNumber(arguments[index + 1], values[index]))
-    {
-      throw std::invalid_argument("неверное число в характеристиках блюда.");
-    }
-  }
-
-  const Food food(
-    arguments[0],
-    values[0],
-    values[1],
-    values[2],
-    values[3],
-    arguments[5]);
+  const Food food(name, values[0], values[detail::proteinIndex], values[detail::fatIndex],
+      values[detail::carbsIndex], category);
 
   if (catalog.add(food.getName(), food))
   {
     output << "блюдо добавлено.\n";
-    return true;
+    return CommandResult::changed;
   }
-  else
-  {
-    output << "блюдо с таким названием уже существует.\n";
-    return false;
-  }
+
+  output << "блюдо с таким названием уже существует.\n";
+  return CommandResult::unchanged;
 }
 
-bool nabieva::removeFood(
-  FoodCatalog& catalog,
-  const std::string& line,
-  std::size_t position,
-  std::ostream& output)
+nabieva::CommandResult nabieva::removeFood(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  FoodCatalog& catalog = context.catalog_;
   std::string name = "";
-  std::string extra = "";
 
-  if (!readToken(line, position, name)
-    || readToken(line, position, extra))
+  if (!(input >> name))
   {
-    throw std::invalid_argument("неверные параметры блюда.");
+    throw std::invalid_argument("не указано название блюда.");
+  }
+
+  std::string extra = "";
+  if (input >> extra)
+  {
+    throw std::invalid_argument("лишние параметры.");
   }
 
   if (catalog.remove(name))
   {
     output << "блюдо удалено.\n";
-    return true;
+    return CommandResult::changed;
   }
-  else
-  {
-    output << "блюдо для удаления не найдено.\n";
-    return false;
-  }
+
+  output << "блюдо для удаления не найдено.\n";
+  return CommandResult::unchanged;
 }
 
-void nabieva::listFood(
-  const FoodCatalog& catalog, std::ostream& output)
+nabieva::CommandResult nabieva::listFood(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  const FoodCatalog& catalog = context.catalog_;
+  std::string extra = "";
+  if (input >> extra)
+  {
+    throw std::invalid_argument("лишние параметры команды.");
+  }
+
   if (catalog.isEmpty())
   {
     output << "каталог блюд пуст.\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   const List< std::string > names = getSortedFoodNames(catalog);
@@ -105,8 +105,8 @@ void nabieva::listFood(
   const std::size_t columnGap = 2;
   std::size_t nameWidth = minimumNameWidth;
 
-  for (List< std::string >::const_iterator current = names.cbegin();
-    current != names.cend(); ++current)
+  for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+      ++current)
   {
     if (getTextWidth(*current) > nameWidth)
     {
@@ -131,17 +131,15 @@ void nabieva::listFood(
   printText(output, "углеводы, г", numericWidth, false);
   output << '\n';
 
-  for (List< std::string >::const_iterator current = names.cbegin();
-    current != names.cend(); ++current)
+  for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+      ++current)
   {
-    const Food* const food = catalog.find(*current);
+    const Food* const food = &catalog.find(*current)->second;
 
     printText(output, food->getName(), nameWidth);
     printText(output, getCategoryText(food->getCategory()), categoryWidth);
 
-    output << std::right
-      << std::setw(numericWidth)
-      << food->getCalories();
+    output << std::right << std::setw(numericWidth) << food->getCalories();
 
     output << std::setw(numericWidth) << food->getProtein();
     output << std::setw(numericWidth) << food->getFat();
@@ -149,19 +147,17 @@ void nabieva::listFood(
   }
 
   output.flags(originalFlags);
+  return CommandResult::unchanged;
 }
 
-void nabieva::saveFood(
-  const FoodCatalog& catalog,
-  const std::string& line,
-  std::size_t position,
-  std::ostream& output)
+nabieva::CommandResult nabieva::saveFood(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  const FoodCatalog& catalog = context.catalog_;
   std::string fileName = "";
   std::string extra = "";
 
-  if (!readToken(line, position, fileName)
-    || readToken(line, position, extra))
+  if (!(input >> fileName) || (input >> extra))
   {
     throw std::invalid_argument("нужно указать одно имя файла.");
   }
@@ -177,16 +173,15 @@ void nabieva::saveFood(
 
   file.imbue(std::locale::classic());
 
-  file << std::setprecision(
-    std::numeric_limits< double >::max_digits10);
+  file << std::setprecision(std::numeric_limits< double >::max_digits10);
 
   file << "FOOD_CATALOG 1\n";
   file << catalog.getSize() << '\n';
 
-  for (List< std::string >::const_iterator current = names.cbegin();
-    current != names.cend(); ++current)
+  for (List< std::string >::const_iterator current = names.cbegin(); current != names.cend();
+      ++current)
   {
-    const Food* const food = catalog.find(*current);
+    const Food* const food = &catalog.find(*current)->second;
 
     file << food->getName() << ' ';
     file << food->getCalories() << ' ';
@@ -204,18 +199,16 @@ void nabieva::saveFood(
   }
 
   output << "каталог блюд сохранён: " << fileName << '\n';
+  return CommandResult::unchanged;
 }
-bool nabieva::loadFood(
-  FoodCatalog& catalog,
-  const std::string& line,
-  std::size_t position,
-  std::ostream& output)
+nabieva::CommandResult nabieva::loadFood(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
+  FoodCatalog& catalog = context.catalog_;
   std::string fileName = "";
   std::string extra = "";
 
-  if (!readToken(line, position, fileName)
-    || readToken(line, position, extra))
+  if (!(input >> fileName) || (input >> extra))
   {
     throw std::invalid_argument("нужно указать одно имя файла.");
   }
@@ -231,15 +224,17 @@ bool nabieva::loadFood(
 
   std::string marker = "";
   std::string version = "";
-  std::string countText = "";
   std::size_t count = 0;
 
-  if (!(file >> marker >> version >> countText)
-    || (marker != "FOOD_CATALOG")
-    || (version != "1")
-    || ((countText != "0") && !readPositiveInteger(countText, count)))
+  if (!(file >> marker >> version) || (marker != "FOOD_CATALOG") || (version != "1"))
   {
     throw std::invalid_argument("неверный заголовок файла каталога блюд.");
+  }
+
+  file >> std::ws;
+  if (!std::isdigit(file.peek()) || !(file >> count) || (!file.eof() && !std::isspace(file.peek())))
+  {
+    throw std::invalid_argument("неверное количество блюд.");
   }
 
   const std::size_t bucketCount = 16;
@@ -249,26 +244,28 @@ bool nabieva::loadFood(
   {
     std::string name = "";
     std::string category = "";
-    std::string numbers[4] = {};
+    double values[detail::nutritionValueCount] = {};
 
-    if (!(file >> name >> numbers[0] >> numbers[1]
-      >> numbers[2] >> numbers[3] >> category))
+    if (!(file >> name))
     {
       throw std::invalid_argument("запись о блюде неполная.");
     }
 
-    double values[4] = {};
-
-    for (std::size_t number = 0; number < 4; ++number)
+    for (std::size_t number = 0; number < detail::nutritionValueCount; ++number)
     {
-      if (!readNumber(numbers[number], values[number]))
+      if (!(file >> values[number]) || !std::isspace(file.peek()))
       {
         throw std::invalid_argument("неверное число в характеристиках блюда.");
       }
     }
 
-    const Food food(name, values[0], values[1],
-      values[2], values[3], category);
+    if (!(file >> category))
+    {
+      throw std::invalid_argument("не указана категория блюда.");
+    }
+
+    const Food food(name, values[0], values[detail::proteinIndex], values[detail::fatIndex],
+        values[detail::carbsIndex], category);
 
     if (!loadedCatalog.add(name, food))
     {
@@ -289,5 +286,5 @@ bool nabieva::loadFood(
   catalog.swap(loadedCatalog);
 
   output << "каталог блюд загружен: " << fileName << '\n';
-  return true;
+  return CommandResult::changed;
 }

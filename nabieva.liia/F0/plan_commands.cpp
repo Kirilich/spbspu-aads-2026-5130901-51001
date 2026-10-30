@@ -1,14 +1,28 @@
 #include "plan_commands.hpp"
-#include "console.hpp"
+#include <cctype>
+#include <cstddef>
 #include <iomanip>
+#include <istream>
 #include <ostream>
 #include <stdexcept>
-#include "input.hpp"
+#include <string>
+#include "application_commands.hpp"
+#include "console.hpp"
+#include "meal_plan.hpp"
+#include "nutrition_constants.hpp"
 
 namespace nabieva
 {
   namespace detail
   {
+    constexpr double mildFactor = 0.90;
+    constexpr double normalFactor = 0.80;
+    constexpr double aggressiveFactor = 0.70;
+    constexpr std::size_t indicatorWidth = 15;
+    constexpr int numericWidth = 14;
+    constexpr int firstCalendarValue = 1;
+    constexpr std::size_t nextDayOffset = 1;
+
     struct planned_day_t
     {
       Date date_;
@@ -20,31 +34,29 @@ namespace nabieva
   {
     if (mode == "mild")
     {
-      return 0.90;
+      return detail::mildFactor;
     }
 
     if (mode == "normal")
     {
-      return 0.80;
+      return detail::normalFactor;
     }
 
     if (mode == "aggressive")
     {
-      return 0.70;
+      return detail::aggressiveFactor;
     }
 
     throw std::invalid_argument("неизвестный режим составления плана.");
   }
-  static void printPlannedDay(
-    const detail::planned_day_t& day,
-    const nutrition_totals_t& goals,
-    std::ostream& output)
+  static void printPlannedDay(const detail::planned_day_t& day, const nutrition_totals_t& goals,
+      std::ostream& output)
   {
     output << "\n" << day.date_.getText() << '\n';
 
-    const char* titles[3] = { "завтрак", "обед", "ужин" };
+    const char* titles[detail::mealsPerDay] = {"завтрак", "обед", "ужин"};
 
-    for (std::size_t index = 0; index < 3; ++index)
+    for (std::size_t index = 0; index < detail::mealsPerDay; ++index)
     {
       const meal_plan_t& part = day.plan_.parts_[index];
 
@@ -52,8 +64,8 @@ namespace nabieva
 
       std::size_t number = 0;
 
-      for (MealList::const_iterator current = part.meals_.cbegin();
-        current != part.meals_.cend(); ++current)
+      for (MealList::const_iterator current = part.meals_.cbegin(); current != part.meals_.cend();
+          ++current)
       {
         ++number;
 
@@ -96,36 +108,27 @@ namespace nabieva
       }
     }
 
-    const double values[4] = {
-      day.plan_.totals_.calories_,
-      day.plan_.totals_.protein_,
-      day.plan_.totals_.fat_,
-      day.plan_.totals_.carbs_
-    };
+    const double values[detail::nutritionValueCount] = {day.plan_.totals_.calories_,
+        day.plan_.totals_.protein_, day.plan_.totals_.fat_, day.plan_.totals_.carbs_};
 
-    const double targets[4] = {
-      goals.calories_,
-      goals.protein_,
-      goals.fat_,
-      goals.carbs_
-    };
+    const double targets[detail::nutritionValueCount] = {goals.calories_, goals.protein_,
+        goals.fat_, goals.carbs_};
 
-    const char* names[4] = {
-      "калории, ккал", "белки, г", "жиры, г", "углеводы, г"
-    };
+    const char* names[detail::nutritionValueCount] = {"калории, ккал", "белки, г", "жиры, г",
+        "углеводы, г"};
 
     output << "\nитого за день:\n";
 
-    printText(output, "показатель", 15);
-    printText(output, "в плане", 14, false);
-    printText(output, "цель", 14, false);
+    printText(output, "показатель", detail::indicatorWidth);
+    printText(output, "в плане", detail::numericWidth, false);
+    printText(output, "цель", detail::numericWidth, false);
     output << "  статус\n";
 
-    for (std::size_t index = 0; index < 4; ++index)
+    for (std::size_t index = 0; index < detail::nutritionValueCount; ++index)
     {
-      printText(output, names[index], 15);
-      output << std::right << std::setw(14) << values[index];
-      output << std::setw(14) << targets[index];
+      printText(output, names[index], detail::indicatorWidth);
+      output << std::right << std::setw(detail::numericWidth) << values[index];
+      output << std::setw(detail::numericWidth) << targets[index];
 
       if (getDeviation(values[index], targets[index]) == 0.0)
       {
@@ -133,8 +136,7 @@ namespace nabieva
       }
       else
       {
-        output << ((values[index] < targets[index])
-          ? "  недостаток\n" : "  избыток\n");
+        output << ((values[index] < targets[index]) ? "  недостаток\n" : "  избыток\n");
       }
     }
 
@@ -148,42 +150,41 @@ namespace nabieva
     }
   }
 }
-void nabieva::generatePlan(
-  const Profile& profile,
-  const FoodCatalog& catalog,
-  const FoodDiary& diary,
-  const std::string& line,
-  std::size_t position,
-  std::ostream& output)
+nabieva::CommandResult nabieva::generatePlan(std::istream& input, command_context_t& context,
+    std::ostream& output)
 {
-  const std::size_t argumentCount = 3;
-  std::string arguments[argumentCount] = {};
-
-  for (std::size_t index = 0; index < argumentCount; ++index)
-  {
-    if (!readToken(line, position, arguments[index]))
-    {
-      throw std::invalid_argument("не хватает параметров плана.");
-    }
-  }
-
+  const Profile& profile = context.profile_;
+  const FoodCatalog& catalog = context.catalog_;
+  const FoodDiary& diary = context.diary_;
+  std::string firstText = "";
+  std::string mode = "";
   std::string extra = "";
   std::size_t days = 0;
   const std::size_t maximumDays = 31;
 
-  if (readToken(line, position, extra)
-    || !readPositiveInteger(arguments[1], days)
-    || (days > maximumDays))
+  if (!(input >> firstText))
+  {
+    throw std::invalid_argument("не указана первая дата плана.");
+  }
+
+  input >> std::ws;
+  if (!std::isdigit(input.peek()) || !(input >> days) || (days == 0) || (days > maximumDays)
+      || !std::isspace(input.peek()))
+  {
+    throw std::invalid_argument("число дней должно быть целым от 1 до 31.");
+  }
+
+  if (!(input >> mode) || (input >> extra))
   {
     throw std::invalid_argument("неверные параметры плана.");
   }
 
-  const Date firstDay = parseDate(arguments[0]);
-  const double factor = getPlanFactor(arguments[2]);
+  const Date firstDay = parseDate(firstText);
+  const double factor = getPlanFactor(mode);
 
   Date lastDay = firstDay;
 
-  for (std::size_t index = 1; index < days; ++index)
+  for (std::size_t index = detail::nextDayOffset; index < days; ++index)
   {
     lastDay = lastDay.getNextDay();
   }
@@ -191,28 +192,30 @@ void nabieva::generatePlan(
   if (!profile.hasData())
   {
     output << "создайте профиль командой \"profile\".\n";
-    return;
+    return CommandResult::unchanged;
   }
 
   if (catalog.isEmpty())
   {
     output << "каталог блюд пуст.\n";
-    return;
+    return CommandResult::unchanged;
   }
 
-  const nutrition_totals_t goals = {
-    profile.getDailyCaloriesGoal() * factor,
-    profile.getDailyProteinGoal() * factor,
-    profile.getDailyFatGoal() * factor,
-    profile.getDailyCarbsGoal() * factor
-  };
+  const nutrition_totals_t goals = {profile.getDailyCaloriesGoal() * factor,
+      profile.getDailyProteinGoal() * factor, profile.getDailyFatGoal() * factor,
+      profile.getDailyCarbsGoal() * factor};
 
-  const Date minimumDate(1, 1, 1);
+  const Date minimumDate(detail::firstCalendarValue, detail::firstCalendarValue,
+      detail::firstCalendarValue);
   const MealList* previousMeals = nullptr;
 
   if (firstDay > minimumDate)
   {
-    previousMeals = diary.find(firstDay.getPreviousDay());
+    const FoodDiary::const_iterator previousDay = diary.find(firstDay.getPreviousDay());
+    if (previousDay != diary.end())
+    {
+      previousMeals = &previousDay->second;
+    }
   }
 
   List< detail::planned_day_t > plans;
@@ -222,10 +225,7 @@ void nabieva::generatePlan(
 
   for (std::size_t index = 0; index < days; ++index)
   {
-    const detail::planned_day_t entry = {
-      date,
-      buildDailyMenu(catalog, goals, previousMeals)
-    };
+    const detail::planned_day_t entry = {date, buildDailyMenu(catalog, goals, previousMeals)};
 
     if (plans.isEmpty())
     {
@@ -239,7 +239,7 @@ void nabieva::generatePlan(
 
     previousMeals = &last->plan_.meals_;
 
-    if (index + 1 < days)
+    if (index + detail::nextDayOffset < days)
     {
       date = date.getNextDay();
     }
@@ -252,7 +252,7 @@ void nabieva::generatePlan(
 
   output << "план: " << firstDay.getText();
   output << " - " << lastDay.getText() << '\n';
-  output << "режим: " << getPlanModeText(arguments[2]) << '\n';
+  output << "режим: " << getPlanModeText(mode) << '\n';
 
   output << "дневные цели: " << goals.calories_ << " ккал";
   output << " | б:" << goals.protein_ << " г";
@@ -260,10 +260,10 @@ void nabieva::generatePlan(
   output << " у:" << goals.carbs_ << " г\n";
   output << "доли целей: завтрак 30%, обед 40%, ужин 30%.\n";
   output << "допустимое отклонение: +/-10%; "
-    << "расчёты выполняются без округления.\n";
+         << "расчёты выполняются без округления.\n";
 
   for (List< detail::planned_day_t >::const_iterator current = plans.cbegin();
-    current != plans.cend(); ++current)
+      current != plans.cend(); ++current)
   {
     printPlannedDay(*current, goals, output);
   }
@@ -272,4 +272,5 @@ void nabieva::generatePlan(
 
   output.flags(originalFlags);
   output.precision(originalPrecision);
+  return CommandResult::unchanged;
 }

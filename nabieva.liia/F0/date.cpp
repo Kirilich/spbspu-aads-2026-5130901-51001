@@ -4,20 +4,23 @@
 
 namespace nabieva
 {
+  namespace detail
+  {
+    constexpr int calendarStep = 1;
+  }
+
   static int getMonthDays(int month, int year)
   {
     const int firstMonth = 1;
     const int monthCount = 12;
-    const int daysInMonths[monthCount] = {
-      31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
-    };
+    const int daysInMonths[monthCount] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     int daysInMonth = daysInMonths[month - firstMonth];
     const int leapYearPeriod = 4;
     const int centuryPeriod = 100;
     const int leapCenturyPeriod = 400;
-    const bool leapYear = ((year % leapYearPeriod == 0)
-      && (year % centuryPeriod != 0)) || (year % leapCenturyPeriod == 0);
+    const bool leapYear = ((year % leapYearPeriod == 0) && (year % centuryPeriod != 0))
+        || (year % leapCenturyPeriod == 0);
     const int february = 2;
 
     if ((month == february) && leapYear)
@@ -29,7 +32,7 @@ namespace nabieva
   }
 }
 
-nabieva::Date::Date(int day, int month, int year) :
+nabieva::Date::Date(int day, int month, int year):
   day_(day),
   month_(month),
   year_(year)
@@ -40,8 +43,7 @@ nabieva::Date::Date(int day, int month, int year) :
   const int monthCount = 12;
   const int firstDay = 1;
 
-  if ((year_ < firstYear) || (year_ > lastYear)
-    || (month_ < firstMonth) || (month_ > monthCount))
+  if ((year_ < firstYear) || (year_ > lastYear) || (month_ < firstMonth) || (month_ > monthCount))
   {
     throw std::invalid_argument("несуществующая дата.");
   }
@@ -118,12 +120,12 @@ nabieva::Date nabieva::Date::getPreviousDay() const
 
   if (day_ > firstDay)
   {
-    return Date(day_ - 1, month_, year_);
+    return Date(day_ - detail::calendarStep, month_, year_);
   }
 
   if (month_ > firstMonth)
   {
-    const int previousMonth = month_ - 1;
+    const int previousMonth = month_ - detail::calendarStep;
     return Date(getMonthDays(previousMonth, year_), previousMonth, year_);
   }
 
@@ -132,7 +134,7 @@ nabieva::Date nabieva::Date::getPreviousDay() const
     throw std::out_of_range("нельзя перейти к дате раньше 01.01.0001.");
   }
 
-  const int previousYear = year_ - 1;
+  const int previousYear = year_ - detail::calendarStep;
   return Date(getMonthDays(lastMonth, previousYear), lastMonth, previousYear);
 }
 
@@ -145,12 +147,12 @@ nabieva::Date nabieva::Date::getNextDay() const
 
   if (day_ < getMonthDays(month_, year_))
   {
-    return Date(day_ + 1, month_, year_);
+    return Date(day_ + detail::calendarStep, month_, year_);
   }
 
   if (month_ < lastMonth)
   {
-    return Date(firstDay, month_ + 1, year_);
+    return Date(firstDay, month_ + detail::calendarStep, year_);
   }
 
   if (year_ == lastYear)
@@ -158,7 +160,7 @@ nabieva::Date nabieva::Date::getNextDay() const
     throw std::out_of_range("нельзя перейти к дате позже 31.12.9999.");
   }
 
-  return Date(firstDay, firstMonth, year_ + 1);
+  return Date(firstDay, firstMonth, year_ + detail::calendarStep);
 }
 
 std::string nabieva::Date::getText() const
@@ -230,7 +232,7 @@ nabieva::Date nabieva::parseDate(const std::string& text)
 nabieva::Date nabieva::getCurrentDate()
 {
   const std::time_t now = std::time(nullptr);
-  const std::time_t timeError = static_cast<std::time_t>(-1);
+  const std::time_t timeError = static_cast< std::time_t >(-1);
 
   if (now == timeError)
   {

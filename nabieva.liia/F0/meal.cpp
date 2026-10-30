@@ -2,7 +2,7 @@
 #include <cmath>
 #include <stdexcept>
 
-nabieva::Meal::Meal(const Food& food, double grams) :
+nabieva::Meal::Meal(const Food& food, double grams):
   food_(food),
   grams_(grams)
 {
@@ -11,8 +11,8 @@ nabieva::Meal::Meal(const Food& food, double grams) :
     throw std::invalid_argument("масса порции должна быть положительным конечным числом.");
   }
 
-  if (!std::isfinite(getCalories()) || !std::isfinite(getProtein())
-    || !std::isfinite(getFat()) || !std::isfinite(getCarbs()))
+  if (!std::isfinite(getCalories()) || !std::isfinite(getProtein()) || !std::isfinite(getFat())
+      || !std::isfinite(getCarbs()))
   {
     throw std::invalid_argument("значения кбжу порции слишком велики.");
   }

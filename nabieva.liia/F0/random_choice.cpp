@@ -5,7 +5,7 @@
 std::mt19937& nabieva::getRandomGenerator()
 {
   const std::chrono::high_resolution_clock::duration time =
-    std::chrono::high_resolution_clock::now().time_since_epoch();
+      std::chrono::high_resolution_clock::now().time_since_epoch();
   static std::mt19937 generator(static_cast< std::mt19937::result_type >(time.count()));
   return generator;
 }
@@ -16,6 +16,7 @@ std::size_t nabieva::getRandomIndex(std::size_t count)
   {
     throw std::invalid_argument("нет вариантов для случайного выбора.");
   }
-  std::uniform_int_distribution< std::size_t > distribution(0, count - 1);
+  const std::size_t upperBoundOffset = 1;
+  std::uniform_int_distribution< std::size_t > distribution(0, count - upperBoundOffset);
   return distribution(getRandomGenerator());
 }

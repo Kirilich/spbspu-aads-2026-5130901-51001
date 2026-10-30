@@ -1,9 +1,9 @@
 #ifndef APPLICATION_COMMANDS_HPP
 #define APPLICATION_COMMANDS_HPP
 
-#include <cstddef>
 #include <iosfwd>
 #include <string>
+#include "bstree.hpp"
 #include "food_catalog.hpp"
 #include "meal_commands.hpp"
 #include "profile.hpp"
@@ -28,8 +28,13 @@ namespace nabieva
     const std::string& dataFile_;
   };
 
-  CommandResult executeCommand(const std::string& command, const std::string& line,
-    std::size_t position, command_context_t& context, std::ostream& output);
+  using CommandHandler = CommandResult (*)(std::istream&, command_context_t&, std::ostream&);
+  using CommandTree = BSTree< std::string, CommandHandler >;
+
+  void registerCommands(CommandTree& commands);
+
+  CommandResult executeCommand(const CommandTree& commands, const std::string& command,
+      std::istream& input, command_context_t& context, std::ostream& output);
 }
 
 #endif
